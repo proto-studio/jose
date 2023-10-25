@@ -1,0 +1,95 @@
+package josevalidators
+
+import (
+	"context"
+
+	"proto.zip/studio/jose/pkg/jose"
+	"proto.zip/studio/validate"
+	"proto.zip/studio/validate/pkg/errors"
+	"proto.zip/studio/validate/pkg/rules"
+	"proto.zip/studio/validate/pkg/rules/objects"
+)
+
+type JWKSRuleSet struct {
+	rules.NoConflict[*jose.JWKS]
+	inner *objects.ObjectRuleSet[*jose.JWKS]
+	items *JWKRuleSet
+}
+
+var baseJwksRuleSet *objects.ObjectRuleSet[*jose.JWKS] = objects.New[*jose.JWKS]()
+
+// NewJWKS creates a new jose.JWKS RuleSet.
+func NewJWKS() *JWKSRuleSet {
+	return &JWKSRuleSet{
+		items: NewJWK(),
+		inner: baseJwksRuleSet,
+	}
+}
+
+// Required returns a boolean indicating if the value is allowed to be omitted when included in a nested object.
+func (ruleSet *JWKSRuleSet) Required() bool {
+	return ruleSet.inner.Required()
+}
+
+// WithRequired returns a new rule set with the required flag set.
+// Use WithRequired when nesting a RuleSet and the a value is not allowed to be omitted.
+func (ruleSet *JWKSRuleSet) WithRequired() *JWKSRuleSet {
+	return &JWKSRuleSet{
+		inner: ruleSet.inner.WithRequired(),
+	}
+}
+
+// Validate performs a validation of a RuleSet against a value and returns a string value or
+// a ValidationErrorCollection.
+func (ruleSet *JWKSRuleSet) Validate(value any) (*jose.JWKS, errors.ValidationErrorCollection) {
+	return ruleSet.ValidateWithContext(value, context.Background())
+}
+
+// Validate performs a validation of a RuleSet against a value and returns a string value or
+// a ValidationErrorCollection.
+//
+// Also, takes a Context which can be used by rules and error formatting.
+func (ruleSet *JWKSRuleSet) ValidateWithContext(value any, ctx context.Context) (*jose.JWKS, errors.ValidationErrorCollection) {
+	return ruleSet.inner.
+		WithKey("keys", validate.Array[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
+		ValidateWithContext(value, ctx)
+}
+
+// Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
+// same type or a ValidationErrorCollection.
+func (ruleSet *JWKSRuleSet) Evaluate(ctx context.Context, value *jose.JWKS) (*jose.JWKS, errors.ValidationErrorCollection) {
+	return ruleSet.inner.
+		WithKey("keys", validate.Array[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
+		Evaluate(ctx, value)
+}
+
+// WithRule returns a new child rule set with a rule added to the list of
+// rules to evaluate. WithRule takes an implementation of the Rule interface
+// for the jose.JWKS type.
+//
+// Use this when implementing custom rules.
+func (ruleSet *JWKSRuleSet) WithRule(rule rules.Rule[*jose.JWKS]) *JWKSRuleSet {
+	return &JWKSRuleSet{
+		inner: ruleSet.inner.WithRule(rule),
+	}
+}
+
+// WithRuleFunc returns a new child rule set with a rule added to the list of
+// rules to evaluate. WithRuleFunc takes an implementation of the Rule interface
+// for the jose.JWKS type.
+//
+// Use this when implementing custom rules.
+func (v *JWKSRuleSet) WithRuleFunc(rule rules.RuleFunc[*jose.JWKS]) *JWKSRuleSet {
+	return v.WithRule(rule)
+}
+
+// Any returns a new RuleSet that wraps the domain RuleSet in any Any rule set
+// which can then be used in nested validation.
+func (ruleSet *JWKSRuleSet) Any() rules.RuleSet[any] {
+	return rules.WrapAny[*jose.JWKS](ruleSet)
+}
+
+// String returns a string representation of the rule set suitable for debugging.
+func (ruleSet *JWKSRuleSet) String() string {
+	return ""
+}

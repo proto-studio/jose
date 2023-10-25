@@ -1,0 +1,60 @@
+package jose
+
+import (
+	"encoding/json"
+)
+
+type JWKS struct {
+	Keys []*JWK `json:"keys" validate:"keys"`
+}
+
+// New creates a new JWKS from a slice of JWK pointers.
+func NewJWKS(jwks ...*JWK) *JWKS {
+	return &JWKS{
+		Keys: jwks,
+	}
+}
+
+// Add appends a JWK to the JWKS.
+func (j *JWKS) Add(jwk *JWK) {
+	j.Keys = append(j.Keys, jwk)
+}
+
+// GetByKid searches for a JWK with the specified kid in the JWKS.
+// Returns the JWK if found, otherwise returns nil.
+func (j *JWKS) GetByKid(kid string) *JWK {
+	for _, key := range j.Keys {
+		if key.Kid == kid {
+			return key
+		}
+	}
+	return nil
+}
+
+// String returns the JSON representation of the JWKS.
+func (j *JWKS) String() string {
+	data, err := json.Marshal(j)
+	if err != nil {
+		return "{}" // or handle this differently
+	}
+	return string(data)
+}
+
+// AlgorithmsFor gets all algorithms that may be able to verify a specific header.
+func (j *JWKS) AlgorithmsFor(head Header) []Algorithm {
+	algs := make([]Algorithm, 0)
+
+	alg, _ := head["alg"].(string)
+	kid, _ := head["kid"].(string)
+
+	for _, key := range j.Keys {
+		if key.Kid == kid {
+			alg, err := key.Algorithm(alg)
+			if alg != nil && err == nil {
+				algs = append(algs, alg)
+			}
+		}
+	}
+
+	return algs
+}
