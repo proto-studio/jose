@@ -4,32 +4,30 @@ import (
 	"context"
 
 	"proto.zip/studio/jose/pkg/jose"
-	"proto.zip/studio/validate"
 	"proto.zip/studio/validate/pkg/errors"
 	"proto.zip/studio/validate/pkg/rules"
-	"proto.zip/studio/validate/pkg/rules/objects"
 )
 
 type JWKRuleSet struct {
 	rules.NoConflict[*jose.JWK]
-	inner *objects.ObjectRuleSet[*jose.JWK]
+	inner *rules.ObjectRuleSet[*jose.JWK, string, any]
 }
 
-var baseJwkRuleSet *objects.ObjectRuleSet[*jose.JWK] = objects.New[*jose.JWK]().
-	WithKey("alg", validate.String().Any()).
+var baseJwkRuleSet *rules.ObjectRuleSet[*jose.JWK, string, any] = rules.Struct[*jose.JWK]().
+	WithKey("alg", rules.String().Any()).
 	// Technically other values are allowed for "use" but we're omitting them. Submit a pull request if you find a valid use other than "sig" and "enc"
-	WithKey("use", validate.String().WithAllowedValues("sig", "enc").Any()).
-	WithKey("kty", validate.String().Any()).
-	WithKey("crv", validate.String().WithAllowedValues("P-256", "P-384", "P-521").Any()).
-	WithKey("kid", validate.String().Any()).
-	WithKey("x", validate.String().Any()).
-	WithKey("y", validate.String().Any()).
-	WithKey("d", validate.String().Any()).
-	WithKey("n", validate.String().Any()).
-	WithKey("e", validate.String().Any())
+	WithKey("use", rules.String().WithAllowedValues("sig", "enc").Any()).
+	WithKey("kty", rules.String().Any()).
+	WithKey("crv", rules.String().WithAllowedValues("P-256", "P-384", "P-521").Any()).
+	WithKey("kid", rules.String().Any()).
+	WithKey("x", rules.String().Any()).
+	WithKey("y", rules.String().Any()).
+	WithKey("d", rules.String().Any()).
+	WithKey("n", rules.String().Any()).
+	WithKey("e", rules.String().Any())
 
-// NewJWK creates a new jose.JWK RuleSet.
-func NewJWK() *JWKRuleSet {
+// JWK creates a new jose.JWK RuleSet.
+func JWK() *JWKRuleSet {
 	return &JWKRuleSet{
 		inner: baseJwkRuleSet,
 	}
@@ -48,23 +46,14 @@ func (ruleSet *JWKRuleSet) WithRequired() *JWKRuleSet {
 	}
 }
 
-// Validate performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationErrorCollection.
-func (ruleSet *JWKRuleSet) Validate(value any) (*jose.JWK, errors.ValidationErrorCollection) {
-	return ruleSet.ValidateWithContext(value, context.Background())
-}
-
-// Validate performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationErrorCollection.
-//
-// Also, takes a Context which can be used by rules and error formatting.
-func (ruleSet *JWKRuleSet) ValidateWithContext(value any, ctx context.Context) (*jose.JWK, errors.ValidationErrorCollection) {
-	return ruleSet.inner.ValidateWithContext(value, ctx)
+// Apply performs a validation of a RuleSet against a value and returns a ValidationErrorCollection.
+func (ruleSet *JWKRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationErrorCollection {
+	return ruleSet.inner.Apply(ctx, input, output)
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
 // same type or a ValidationErrorCollection.
-func (ruleSet *JWKRuleSet) Evaluate(ctx context.Context, value *jose.JWK) (*jose.JWK, errors.ValidationErrorCollection) {
+func (ruleSet *JWKRuleSet) Evaluate(ctx context.Context, value *jose.JWK) errors.ValidationErrorCollection {
 	return ruleSet.inner.Evaluate(ctx, value)
 }
 

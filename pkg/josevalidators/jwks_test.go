@@ -1,6 +1,7 @@
 package josevalidators_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -12,7 +13,6 @@ import (
 
 // validateJwkTest takes a Json string containing a JWK, parses it, and checks the return value
 func testProcessJWKS(t testing.TB, jwksJSON string, ruleSet rules.RuleSet[*jose.JWKS]) {
-	// Attempt to parse the JSON to check its validity
 	var jwks map[string]any
 	if err := json.Unmarshal([]byte(jwksJSON), &jwks); err != nil {
 		t.Fatalf("Failed to parse JWKS JSON: %v", err)
@@ -20,15 +20,16 @@ func testProcessJWKS(t testing.TB, jwksJSON string, ruleSet rules.RuleSet[*jose.
 
 	// If the JSON is valid, call the provided function
 	// Purposely converting to Any() here because that will be the most common use of this rule set.
-	if _, err := ruleSet.Any().Validate(jwks); err != nil {
-		t.Errorf("Validate function returned an error: %v", err)
+	var output *jose.JWKS
+	if err := ruleSet.Any().Apply(context.Background(), jwks, &output); err != nil {
+		t.Errorf("Apply function returned an error: %v", err)
 	}
 }
 
 // Requirements:
 // - Implements JWKS rule interface.
 func TestJWKSRuleSet(t *testing.T) {
-	ok := testhelpers.CheckRuleSetInterface[*jose.JWK](josevalidators.NewJWK())
+	ok := testhelpers.CheckRuleSetInterface[*jose.JWK](josevalidators.JWK())
 	if !ok {
 		t.Error("Expected rule set to be implemented")
 		return

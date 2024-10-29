@@ -70,11 +70,14 @@ func (r *RSA) signWithProtected(protected string, payload []byte) (*Signature, e
 func (r *RSA) Sign(typ string, payload []byte) (*Signature, error) {
 	protected := Header{
 		HeaderAlg: r.Name(),
-		HeaderKid: r.Kid,
 		HeaderTyp: typ,
-	}.Encoded()
+	}
 
-	return r.signWithProtected(protected, payload)
+	if r.Kid != "" {
+		protected[HeaderKid] = r.Kid
+	}
+
+	return r.signWithProtected(protected.Encoded(), payload)
 }
 
 func (r *RSA) Verify(sig *Signature, payload []byte) bool {

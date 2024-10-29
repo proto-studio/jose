@@ -54,11 +54,15 @@ func (e *ECDSA) hash(protected string, payload []byte) ([]byte, error) {
 func (e *ECDSA) Sign(typ string, payload []byte) (*Signature, error) {
 	protected := Header{
 		HeaderAlg: e.Name(),
-		HeaderKid: e.Kid,
 		HeaderTyp: typ,
-	}.Encoded()
+	}
+	if e.Kid != "" {
+		protected[HeaderKid] = e.Kid
+	}
 
-	hash, err := e.hash(protected, payload)
+	protectedStr := protected.Encoded()
+
+	hash, err := e.hash(protectedStr, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +74,7 @@ func (e *ECDSA) Sign(typ string, payload []byte) (*Signature, error) {
 	sig := append(r.Bytes(), s.Bytes()...)
 
 	return &Signature{
-		Protected: protected,
+		Protected: protectedStr,
 		Signature: base64url.Encode(sig),
 	}, nil
 

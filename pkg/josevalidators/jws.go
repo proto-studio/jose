@@ -24,8 +24,8 @@ type JWSRuleSet struct {
 	rule     rules.Rule[*jose.JWS]
 }
 
-// NewJWS creates a new jose.JWS RuleSet.
-func NewJWS() *JWSRuleSet {
+// JWS creates a new jose.JWS RuleSet.
+func JWS() *JWSRuleSet {
 	return &JWSRuleSet{}
 }
 
@@ -47,16 +47,45 @@ func (ruleSet *JWSRuleSet) WithRequired() *JWSRuleSet {
 	}
 }
 
-// Validate performs a validation of a RuleSet against a value and returns a string value or
+// Apply performs a validation of a RuleSet against a value and returns a string value or
 // a ValidationErrorCollection.
-func (ruleSet *JWSRuleSet) Validate(value any) (*jose.JWS, errors.ValidationErrorCollection) {
-	return ruleSet.ValidateWithContext(value, context.Background())
+func (ruleSet *JWSRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationErrorCollection {
+	// Ensure output is a non-nil pointer
+	outputVal := reflect.ValueOf(output)
+	if outputVal.Kind() != reflect.Ptr || outputVal.IsNil() {
+		return errors.Collection(errors.Errorf(
+			errors.CodeInternal, ctx, "Output must be a non-nil pointer",
+		))
+	}
+
+	jws, errs := ruleSet.coerce(input, ctx)
+	if len(errs) > 0 {
+		return errs
+	}
+
+	if errs := ruleSet.Evaluate(ctx, jws); errs != nil {
+		return errs
+	}
+
+	outputElem := outputVal.Elem()
+
+	if outputElem.Kind() == reflect.Interface && outputElem.IsNil() {
+		outputElem.Set(reflect.ValueOf(jws))
+	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jws)) {
+		outputElem.Set(reflect.ValueOf(jws))
+	} else {
+		return errors.Collection(errors.Errorf(
+			errors.CodeInternal, ctx, "Cannot assign %T to %T", jws, outputElem.Interface(),
+		))
+	}
+
+	return nil
 }
 
 // coerceString attempts to coerce a string containing a compact JWS into a *jose.JWS and returns ValidationErrorCollection.
 // This method will return a non-nil empty collection if there are no errors.
-func (ruleSet *JWSRuleSet) parseCompact(ctx context.Context, value string) (*jose.JWS, errors.ValidationErrorCollection) {
-	parts := strings.Split(value, ".")
+func (ruleSet *JWSRuleSet) coerce(value any, ctx context.Context) (*jose.JWS, errors.ValidationErrorCollection) {
+	parts := strings.Split(value.(string), ".")
 
 	allErrors := errors.Collection()
 
@@ -102,36 +131,9 @@ func (ruleSet *JWSRuleSet) parseCompact(ctx context.Context, value string) (*jos
 	return &jws, allErrors
 }
 
-// Validate performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationErrorCollection.
-//
-// Also, takes a Context which can be used by rules and error formatting.
-func (ruleSet *JWSRuleSet) ValidateWithContext(value any, ctx context.Context) (*jose.JWS, errors.ValidationErrorCollection) {
-	var jws *jose.JWS
-
-	switch v := value.(type) {
-	case jose.JWS:
-		jws = &v
-	case *jose.JWS:
-		jws = v
-	case string:
-		var parseErrors errors.ValidationErrorCollection
-		jws, parseErrors = ruleSet.parseCompact(ctx, v)
-		if len(parseErrors) > 0 {
-			return nil, parseErrors
-		}
-	default:
-		return nil, errors.Collection(
-			errors.NewCoercionError(ctx, "JWT", reflect.ValueOf(value).Kind().String()),
-		)
-	}
-
-	return ruleSet.Evaluate(ctx, jws)
-}
-
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
 // same type or a ValidationErrorCollection.
-func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) (*jose.JWS, errors.ValidationErrorCollection) {
+func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors.ValidationErrorCollection {
 	headerCtx := rulecontext.WithPathString(ctx, "header")
 	signatureCtx := rulecontext.WithPathString(ctx, "signature")
 	protectedCtx := rulecontext.WithPathString(ctx, "protected")
@@ -164,7 +166,8 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) (*jose
 	}
 
 	if value.Header != nil {
-		_, headerErrors := baseHeaderRuleSet.ValidateWithContext(value.Header, ctx)
+		var header any
+		headerErrors := baseHeaderRuleSet.Apply(ctx, value.Header, &header)
 		if headerErrors != nil {
 			allErrors = append(allErrors, headerErrors...)
 		}
@@ -190,21 +193,17 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) (*jose
 
 	for currentRuleSet != nil {
 		if currentRuleSet.rule != nil {
-			newJws, errs := currentRuleSet.rule.Evaluate(ctx, value)
-			if errs != nil {
+			if errs := currentRuleSet.rule.Evaluate(ctx, value); errs != nil {
 				allErrors = append(allErrors, errs...)
-			} else {
-				value = newJws
 			}
 		}
-
 		currentRuleSet = currentRuleSet.parent
 	}
 
 	if len(allErrors) > 0 {
-		return nil, allErrors
+		return allErrors
 	}
-	return value, nil
+	return nil
 }
 
 // WithRule returns a new child rule set with a rule added to the list of

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"proto.zip/studio/jose/pkg/jose"
-	"proto.zip/studio/validate"
 	"proto.zip/studio/validate/pkg/errors"
 	"proto.zip/studio/validate/pkg/rules"
 )
@@ -16,9 +15,9 @@ type JWTRuleSet struct {
 	parent *JWTRuleSet
 }
 
-func NewJWT() *JWTRuleSet {
+func JWT() *JWTRuleSet {
 	return &JWTRuleSet{
-		inner: NewJWS(),
+		inner: JWS(),
 	}
 }
 
@@ -36,46 +35,66 @@ func (ruleSet *JWTRuleSet) WithRequired() *JWTRuleSet {
 	}
 }
 
-// Validate performs a validation of a RuleSet against a value and returns a JWT value or
+// Apply performs a validation of a RuleSet against a value and returns a JWT value or
 // a ValidationErrorCollection.
-func (ruleSet *JWTRuleSet) Validate(value any) (*jose.JWT, errors.ValidationErrorCollection) {
-	return ruleSet.ValidateWithContext(value, context.Background())
-}
-
-// Validate performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationErrorCollection.
-//
-// Also, takes a Context which can be used by rules and error formatting.
-func (ruleSet *JWTRuleSet) ValidateWithContext(value any, ctx context.Context) (*jose.JWT, errors.ValidationErrorCollection) {
-	jws, err := ruleSet.inner.ValidateWithContext(value, ctx)
-	if err != nil {
-		return nil, err
+func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationErrorCollection {
+	var jws *jose.JWS
+	if err := ruleSet.inner.Apply(ctx, input, &jws); err != nil {
+		return err
 	}
 
 	jwt, conversionErr := jose.JWTFromJWS(jws)
 	if conversionErr != nil {
-		return nil, errors.Collection(
+		return errors.Collection(
 			errors.Errorf(errors.CodeType, ctx, "Unable to convert JWS to JWT"),
 		)
 	}
 
-	newClaims, err := validate.MapAny().
+	var newClaims map[string]any
+	if err := rules.StringMap[any]().
 		WithUnknown().
-		WithKey(jose.ExpirationKey, validate.Int64().Any()).
-		Validate(jwt.Claims)
-
-	if err != nil {
-		return nil, err
+		WithKey(jose.ExpirationKey, rules.Int64().Any()).
+		Apply(ctx, jwt.Claims, &newClaims); err != nil {
+		return err
 	}
 
 	jwt.Claims = newClaims
-	return jwt, nil
+
+	// Set output if pointer provided
+	if outputPtr, ok := output.(**jose.JWT); ok {
+		*outputPtr = jwt
+	}
+
+	return nil
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
 // same type or a ValidationErrorCollection.
-func (ruleSet *JWTRuleSet) Evaluate(ctx context.Context, value *jose.JWT) (*jose.JWT, errors.ValidationErrorCollection) {
-	return ruleSet.ValidateWithContext(value, ctx)
+func (ruleSet *JWTRuleSet) Evaluate(ctx context.Context, value *jose.JWT) errors.ValidationErrorCollection {
+	jws, jwsErr := value.JWS()
+	if jwsErr != nil {
+		return errors.Collection(errors.Errorf(errors.CodeType, ctx, "Unable to get JWS from JWT"))
+	}
+	if err := ruleSet.inner.Evaluate(ctx, jws); err != nil {
+		return err
+	}
+
+	var output *jose.JWT
+	if err := ruleSet.Apply(ctx, value, &output); err != nil {
+		return err
+	}
+
+	currentRuleSet := ruleSet
+	for currentRuleSet != nil {
+		if currentRuleSet.rule != nil {
+			if err := currentRuleSet.rule.Evaluate(ctx, value); err != nil {
+				return err
+			}
+		}
+		currentRuleSet = currentRuleSet.parent
+	}
+
+	return nil
 }
 
 // WithRule returns a new child rule set with a rule added to the list of

@@ -1,6 +1,7 @@
 package josevalidators_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -12,14 +13,21 @@ import (
 
 const compactString string = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.2_LNHFdcd5lv342TTvWSroucQY03R4ZBBM1Pwgvfqt8"
 
-func jwsValidCheck(a, b any) error {
+func checkJWS(b, a any) error {
+	jws, ok := a.(*jose.JWS)
+	if !ok {
+		return errors.Errorf(errors.CodeInternal, context.Background(), "Expected *jose.JWS, got %T", a)
+	}
+	if jws == nil {
+		return errors.Errorf(errors.CodeInternal, context.Background(), "Expected jws to be non-nil")
+	}
 	return nil
 }
 
 // Requirements:
 // - Implements interface.
 func TestJWSRuleSet(t *testing.T) {
-	ok := testhelpers.CheckRuleSetInterface[*jose.JWS](josevalidators.NewJWS())
+	ok := testhelpers.CheckRuleSetInterface[*jose.JWS](josevalidators.JWS())
 	if !ok {
 		t.Error("Expected rule set to be implemented")
 		return
@@ -33,9 +41,10 @@ func TestJWSRuleSet(t *testing.T) {
 // - Headers is nil.
 // - JWS is flat (Signatures is nil).
 func TestJWSParseCompact(t *testing.T) {
-	ruleSet := josevalidators.NewJWS()
+	ruleSet := josevalidators.JWS()
 
-	jws, err := ruleSet.Validate(compactString)
+	var jws *jose.JWS
+	err := ruleSet.Apply(context.Background(), compactString, &jws)
 
 	if err != nil {
 		t.Fatalf("Expected error to be nil, got: %s", err)
@@ -69,31 +78,31 @@ func TestJWSParseCompact(t *testing.T) {
 // Requirements:
 // - Fails if less than 2 parts.
 func TestJWSParseNoPayload(t *testing.T) {
-	ruleSet := josevalidators.NewJWS()
+	ruleSet := josevalidators.JWS()
 	val := "eyJhbGciOiJIUzI1NiJ9"
-	testhelpers.MustBeInvalid(t, ruleSet.Any(), val, errors.CodePattern)
+	testhelpers.MustNotApply(t, ruleSet.Any(), val, errors.CodePattern)
 }
 
 // Requirements:
 // - Fails if less more than 3 parts.
 func TestJWSParseTooManyParts(t *testing.T) {
-	ruleSet := josevalidators.NewJWS()
+	ruleSet := josevalidators.JWS()
 	val := compactString + ".eyJhbGciOiJIUzI1NiJ9"
-	testhelpers.MustBeInvalid(t, ruleSet.Any(), val, errors.CodePattern)
+	testhelpers.MustNotApply(t, ruleSet.Any(), val, errors.CodePattern)
 }
 
 // Requirements:
 // - Fails if 2 parts and None is not enabled
 // - Succeeds if 2 parts and none is enabled
 func TestJWSParseNone(t *testing.T) {
-	ruleSet := josevalidators.NewJWS()
+	ruleSet := josevalidators.JWS()
 	val := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0"
 
-	testhelpers.MustBeInvalid(t, ruleSet.Any(), val, errors.CodePattern)
+	testhelpers.MustNotApply(t, ruleSet.Any(), val, errors.CodePattern)
 
 	jose.EnableNone()
-	defer jose.EnableNone()
-	testhelpers.MustBeValidFunc(t, ruleSet.Any(), val, nil, jwsValidCheck)
+	defer jose.DisableNone()
+	testhelpers.MustApplyFunc(t, ruleSet.Any(), val, nil, checkJWS)
 }
 
 // Requirements:
@@ -103,16 +112,16 @@ func TestJWSParseNone(t *testing.T) {
 // - Paths must match
 // - Returns all errors
 func TestBase64URL(t *testing.T) {
-	ruleSet := josevalidators.NewJWS()
+	ruleSet := josevalidators.JWS()
 
 	parts := strings.Split(compactString, ".")
 
-	testhelpers.MustBeValidFunc(t, ruleSet.Any(), strings.Join(parts, "."), nil, jwsValidCheck)
+	testhelpers.MustApplyFunc(t, ruleSet.Any(), strings.Join(parts, "."), nil, checkJWS)
 
 	backup := parts[0]
 	parts[0] = parts[0] + "/"
 
-	err := testhelpers.MustBeInvalid(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
+	err := testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
 		valErr := err.(errors.ValidationErrorCollection)
 
@@ -129,7 +138,7 @@ func TestBase64URL(t *testing.T) {
 	backup = parts[1]
 	parts[1] = parts[1] + "/"
 
-	err = testhelpers.MustBeInvalid(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
+	err = testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
 		valErr := err.(errors.ValidationErrorCollection)
 
@@ -145,7 +154,7 @@ func TestBase64URL(t *testing.T) {
 
 	parts[2] = parts[2] + "/"
 
-	err = testhelpers.MustBeInvalid(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
+	err = testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
 		valErr := err.(errors.ValidationErrorCollection)
 
@@ -160,7 +169,7 @@ func TestBase64URL(t *testing.T) {
 
 	parts[1] = parts[1] + "/"
 
-	err = testhelpers.MustBeInvalid(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
+	err = testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
 		valErr := err.(errors.ValidationErrorCollection)
 
@@ -177,9 +186,10 @@ func TestVerify(t *testing.T) {
 		t.Fatalf("Expected err to be nil, got: %s", err)
 	}
 
-	ruleSet := josevalidators.NewJWS().WithVerifyJWK(jwk)
+	ruleSet := josevalidators.JWS().WithVerifyJWK(jwk)
 
-	_, verr := ruleSet.Validate(`eyJhbGciOiJSUzI1NiIsImtpZCI6IlJTQTIwMjQwMjEyIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhZmQyODE0Yi00M2I4LTRjYmYtOGFmYy03NDY2MDJlMDBjMDQiLCJhdXRoX3RpbWUiOjE3MDgyNzczMzUsImV4cCI6MTcwODI4MTAxMSwiaWF0IjoxNzA4Mjc3NDEwLCJpc3MiOiJodHRwczovL3N0dWRpby5kZXYucHJvdG9hdXRoLmNvbSIsIm5vbmNlIjoiRjFGRnh5Y1lrWSIsInN1YiI6IjJjYjZiNmQ2LWEwY2ItNGI3Mi1iY2EwLTI1YTI5NzJkNjM3YiJ9.Q3Coybou0LIyQAhKDWSlq92E5xAIBfiOm51feugylkZ4SV5MQIwRJLNkK7ucYPUzMROZ6E5xFIlrbVojo4vPM8CTODD7A9IOKwa-qaEikIx7K4MGLCHo-NLGdMEEQh8hQZ_4Bs8tlJUSOn_SUXeSNXTyUI7jpRZ0cKtcyS9V-QIhe1hNcm9_RCJ2auOqr9ZyDWUelpdLGoaN1oT9aAsFUAfUjlA0E_V8J5IV2BLZ96W21ENfB4Jiys0NFiM-FNk-M94Xmq9KK51Brd-zmDBYQ3Sw7_8dy_PtLPLGbM9geDcTsi_RjjjQak2p5iR6qt2xiicQQhlJdYCVDRBIdXbhcg`)
+	var jws *jose.JWS
+	verr := ruleSet.Apply(context.Background(), `eyJhbGciOiJSUzI1NiIsImtpZCI6IlJTQTIwMjQwMjEyIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhZmQyODE0Yi00M2I4LTRjYmYtOGFmYy03NDY2MDJlMDBjMDQiLCJhdXRoX3RpbWUiOjE3MDgyNzczMzUsImV4cCI6MTcwODI4MTAxMSwiaWF0IjoxNzA4Mjc3NDEwLCJpc3MiOiJodHRwczovL3N0dWRpby5kZXYucHJvdG9hdXRoLmNvbSIsIm5vbmNlIjoiRjFGRnh5Y1lrWSIsInN1YiI6IjJjYjZiNmQ2LWEwY2ItNGI3Mi1iY2EwLTI1YTI5NzJkNjM3YiJ9.Q3Coybou0LIyQAhKDWSlq92E5xAIBfiOm51feugylkZ4SV5MQIwRJLNkK7ucYPUzMROZ6E5xFIlrbVojo4vPM8CTODD7A9IOKwa-qaEikIx7K4MGLCHo-NLGdMEEQh8hQZ_4Bs8tlJUSOn_SUXeSNXTyUI7jpRZ0cKtcyS9V-QIhe1hNcm9_RCJ2auOqr9ZyDWUelpdLGoaN1oT9aAsFUAfUjlA0E_V8J5IV2BLZ96W21ENfB4Jiys0NFiM-FNk-M94Xmq9KK51Brd-zmDBYQ3Sw7_8dy_PtLPLGbM9geDcTsi_RjjjQak2p5iR6qt2xiicQQhlJdYCVDRBIdXbhcg`, &jws)
 
 	if verr != nil {
 		t.Errorf("Expected validation errors to be ni, got: %s", verr)

@@ -51,11 +51,13 @@ func (h *HMAC) signWithProtected(protected string, payload []byte) (*Signature, 
 func (h *HMAC) Sign(typ string, payload []byte) (*Signature, error) {
 	protected := Header{
 		HeaderAlg: h.Name(),
-		HeaderKid: h.Kid,
 		HeaderTyp: typ,
-	}.Encoded()
+	}
+	if h.Kid != "" {
+		protected[HeaderKid] = h.Kid
+	}
 
-	return h.signWithProtected(protected, payload)
+	return h.signWithProtected(protected.Encoded(), payload)
 }
 
 func (h *HMAC) Verify(sig *Signature, payload []byte) bool {

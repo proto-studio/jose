@@ -1,6 +1,7 @@
 package josevalidators_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 // Requirements:
 // - Implements JWS rule interface.
 func TestJWKRuleSet(t *testing.T) {
-	ok := testhelpers.CheckRuleSetInterface[*jose.JWK](josevalidators.NewJWK())
+	ok := testhelpers.CheckRuleSetInterface[*jose.JWK](josevalidators.JWK())
 	if !ok {
 		t.Error("Expected rule set to be implemented")
 		return
@@ -29,8 +30,8 @@ func testProcessJWK(t testing.TB, jwkJSON string, ruleSet rules.RuleSet[*jose.JW
 	}
 
 	// If the JSON is valid, call the provided function
-	if _, err := ruleSet.Validate(jwk); err != nil {
-		t.Errorf("Validate function returned an error: %v", err)
+	if errs := ruleSet.Apply(context.Background(), jwk, &jose.JWK{}); len(errs) > 0 {
+		t.Errorf("Apply function returned errors: %v", errs)
 	}
 }
 
@@ -39,7 +40,7 @@ func testProcessJWK(t testing.TB, jwkJSON string, ruleSet rules.RuleSet[*jose.JW
 func TestES256(t *testing.T) {
 	const jwkJson = `{"kty":"EC","crv":"P-256","kid":"EC20240131","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`
 
-	validator := josevalidators.NewJWK()
+	validator := josevalidators.JWK()
 
 	testProcessJWK(t, jwkJson, validator)
 }

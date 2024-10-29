@@ -4,24 +4,22 @@ import (
 	"context"
 
 	"proto.zip/studio/jose/pkg/jose"
-	"proto.zip/studio/validate"
 	"proto.zip/studio/validate/pkg/errors"
 	"proto.zip/studio/validate/pkg/rules"
-	"proto.zip/studio/validate/pkg/rules/objects"
 )
 
 type JWKSRuleSet struct {
 	rules.NoConflict[*jose.JWKS]
-	inner *objects.ObjectRuleSet[*jose.JWKS]
+	inner *rules.ObjectRuleSet[*jose.JWKS, string, any]
 	items *JWKRuleSet
 }
 
-var baseJwksRuleSet *objects.ObjectRuleSet[*jose.JWKS] = objects.New[*jose.JWKS]()
+var baseJwksRuleSet *rules.ObjectRuleSet[*jose.JWKS, string, any] = rules.Struct[*jose.JWKS]()
 
 // NewJWKS creates a new jose.JWKS RuleSet.
 func NewJWKS() *JWKSRuleSet {
 	return &JWKSRuleSet{
-		items: NewJWK(),
+		items: JWK(),
 		inner: baseJwksRuleSet,
 	}
 }
@@ -39,27 +37,19 @@ func (ruleSet *JWKSRuleSet) WithRequired() *JWKSRuleSet {
 	}
 }
 
-// Validate performs a validation of a RuleSet against a value and returns a string value or
+// Apply performs a validation of a RuleSet against a value and returns a string value or
 // a ValidationErrorCollection.
-func (ruleSet *JWKSRuleSet) Validate(value any) (*jose.JWKS, errors.ValidationErrorCollection) {
-	return ruleSet.ValidateWithContext(value, context.Background())
-}
-
-// Validate performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationErrorCollection.
-//
-// Also, takes a Context which can be used by rules and error formatting.
-func (ruleSet *JWKSRuleSet) ValidateWithContext(value any, ctx context.Context) (*jose.JWKS, errors.ValidationErrorCollection) {
+func (ruleSet *JWKSRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationErrorCollection {
 	return ruleSet.inner.
-		WithKey("keys", validate.Array[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
-		ValidateWithContext(value, ctx)
+		WithKey("keys", rules.Slice[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
+		Apply(ctx, input, output)
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
 // same type or a ValidationErrorCollection.
-func (ruleSet *JWKSRuleSet) Evaluate(ctx context.Context, value *jose.JWKS) (*jose.JWKS, errors.ValidationErrorCollection) {
+func (ruleSet *JWKSRuleSet) Evaluate(ctx context.Context, value *jose.JWKS) errors.ValidationErrorCollection {
 	return ruleSet.inner.
-		WithKey("keys", validate.Array[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
+		WithKey("keys", rules.Slice[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
 		Evaluate(ctx, value)
 }
 

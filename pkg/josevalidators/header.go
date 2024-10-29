@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"proto.zip/studio/jose/pkg/jose"
-	"proto.zip/studio/validate"
 	"proto.zip/studio/validate/pkg/errors"
 	"proto.zip/studio/validate/pkg/rules"
 )
@@ -17,23 +16,23 @@ var algorithms []string = []string{
 	"HS512",
 }
 
-func noneGate(ctx context.Context, value string) (string, errors.ValidationErrorCollection) {
+func noneGate(ctx context.Context, value string) errors.ValidationErrorCollection {
 	if value == "" || value == "none" {
 		if !jose.None() {
-			return "", errors.Collection(errors.Errorf(errors.CodeForbidden, ctx, "Signature required"))
+			return errors.Collection(errors.Errorf(errors.CodeForbidden, ctx, "Signature required"))
 		}
 	}
 
-	return value, nil
+	return nil
 }
 
-var algRuleSet rules.RuleSet[string] = validate.String().WithAllowedValues(algorithms[0], algorithms[1:]...).WithRuleFunc(noneGate)
-var typRuleSet rules.RuleSet[string] = validate.String().WithMinLen(1)
-var kidRuleSet rules.RuleSet[string] = validate.String().WithMinLen(1)
-var ctyRuleSet rules.RuleSet[string] = validate.String()
-var jkuRuleSet rules.RuleSet[string] = validate.String()
+var algRuleSet rules.RuleSet[string] = rules.String().WithAllowedValues(algorithms[0], algorithms[1:]...).WithRuleFunc(noneGate)
+var typRuleSet rules.RuleSet[string] = rules.String().WithMinLen(1)
+var kidRuleSet rules.RuleSet[string] = rules.String().WithMinLen(1)
+var ctyRuleSet rules.RuleSet[string] = rules.String()
+var jkuRuleSet rules.RuleSet[string] = rules.String()
 
-var baseHeaderRuleSet rules.RuleSet[map[string]any] = validate.Map[any]().
+var baseHeaderRuleSet rules.RuleSet[map[string]any] = rules.StringMap[any]().
 	WithKey("alg", algRuleSet.Any()).
 	WithKey("typ", typRuleSet.Any()).
 	WithKey("kid", kidRuleSet.Any()).
@@ -42,6 +41,6 @@ var baseHeaderRuleSet rules.RuleSet[map[string]any] = validate.Map[any]().
 
 type HeaderRuleSet rules.RuleSet[map[string]any]
 
-func NewHeader() HeaderRuleSet {
+func Header() HeaderRuleSet {
 	return baseHeaderRuleSet
 }
