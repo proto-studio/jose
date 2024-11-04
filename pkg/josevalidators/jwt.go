@@ -2,6 +2,7 @@ package josevalidators
 
 import (
 	"context"
+	"reflect"
 
 	"proto.zip/studio/jose/pkg/jose"
 	"proto.zip/studio/validate/pkg/errors"
@@ -60,9 +61,23 @@ func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.
 
 	jwt.Claims = newClaims
 
-	// Set output if pointer provided
-	if outputPtr, ok := output.(**jose.JWT); ok {
-		*outputPtr = jwt
+	outputVal := reflect.ValueOf(output)
+	outputElem := outputVal.Elem()
+
+	if outputElem.Kind() == reflect.Interface && outputElem.IsNil() {
+		outputElem.Set(reflect.ValueOf(jwt))
+	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jwt)) {
+		outputElem.Set(reflect.ValueOf(jwt))
+	} else if outputElem.Type().AssignableTo(reflect.TypeOf(*jwt)) {
+		outputElem.Set(reflect.ValueOf(*jwt))
+	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jws)) {
+		outputElem.Set(reflect.ValueOf(jws))
+	} else if outputElem.Type().AssignableTo(reflect.TypeOf(*jws)) {
+		outputElem.Set(reflect.ValueOf(*jws))
+	} else {
+		return errors.Collection(errors.Errorf(
+			errors.CodeInternal, ctx, "Cannot assign %T to %T", jwt, outputElem.Interface(),
+		))
 	}
 
 	return nil
