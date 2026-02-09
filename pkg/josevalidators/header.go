@@ -16,10 +16,10 @@ var algorithms []string = []string{
 	"HS512",
 }
 
-func noneGate(ctx context.Context, value string) errors.ValidationErrorCollection {
+func noneGate(ctx context.Context, value string) errors.ValidationError {
 	if value == "" || value == "none" {
 		if !jose.None() {
-			return errors.Collection(errors.Errorf(errors.CodeForbidden, ctx, "Signature required"))
+			return errors.Errorf(errors.CodeForbidden, ctx, "Signature required", "Signature required")
 		}
 	}
 

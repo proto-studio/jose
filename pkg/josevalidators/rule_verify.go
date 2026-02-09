@@ -14,35 +14,29 @@ type verifyRule struct {
 }
 
 // Evaluate takes a context and string value and returns an error if it is not equal or greater in length than the specified value.
-func (rule *verifyRule) Evaluate(ctx context.Context, value *jose.JWS) errors.ValidationErrorCollection {
+func (rule *verifyRule) Evaluate(ctx context.Context, value *jose.JWS) errors.ValidationError {
 	head, err := value.FullHeader()
 
 	if err != nil {
-		return errors.Collection(
-			errors.Errorf(errors.CodeEncoding, ctx, "unable to decode header"),
-		)
+		return errors.Errorf(errors.CodeEncoding, ctx, "unable to decode header", "unable to decode header")
 	}
 
 	if alg := head[jose.HeaderAlg]; alg == "" || alg == "none" {
-		return errors.Collection(
-			errors.Errorf(errors.CodeEncoding, ctx, "JWS must be signed"),
-		)
+		return errors.Errorf(errors.CodeEncoding, ctx, "JWS must be signed", "JWS must be signed")
 	}
 
 	jwk := rule.fn(ctx, head)
 
 	if ok := value.Verify(jwk); !ok {
-		return errors.Collection(
-			errors.Errorf(errors.CodeEncoding, ctx, "unable to verify signature"),
-		)
+		return errors.Errorf(errors.CodeEncoding, ctx, "unable to verify signature", "unable to verify signature")
 	}
 
 	return nil
 }
 
-// Conflict returns true for any minimum length rule.
-func (rule *verifyRule) Conflict(x rules.Rule[*jose.JWS]) bool {
-	_, ok := x.(*verifyRule)
+// Replaces returns true if this rule should replace the given rule.
+func (rule *verifyRule) Replaces(r rules.Rule[*jose.JWS]) bool {
+	_, ok := r.(*verifyRule)
 	return ok
 }
 

@@ -48,23 +48,23 @@ func (ruleSet *JWSRuleSet) WithRequired() *JWSRuleSet {
 }
 
 // Apply performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationErrorCollection.
-func (ruleSet *JWSRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationErrorCollection {
+// a ValidationError.
+func (ruleSet *JWSRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationError {
 	// Ensure output is a non-nil pointer
 	outputVal := reflect.ValueOf(output)
 	if outputVal.Kind() != reflect.Ptr || outputVal.IsNil() {
-		return errors.Collection(errors.Errorf(
-			errors.CodeInternal, ctx, "Output must be a non-nil pointer",
-		))
+		return errors.Errorf(
+			errors.CodeInternal, ctx, "Output must be a non-nil pointer", "Output must be a non-nil pointer",
+		)
 	}
 
-	jws, errs := ruleSet.coerce(input, ctx)
-	if len(errs) > 0 {
-		return errs
+	jws, err := ruleSet.coerce(input, ctx)
+	if err != nil {
+		return err
 	}
 
-	if errs := ruleSet.Evaluate(ctx, jws); errs != nil {
-		return errs
+	if err := ruleSet.Evaluate(ctx, jws); err != nil {
+		return err
 	}
 
 	outputElem := outputVal.Elem()
@@ -74,40 +74,39 @@ func (ruleSet *JWSRuleSet) Apply(ctx context.Context, input, output any) errors.
 	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jws)) {
 		outputElem.Set(reflect.ValueOf(jws))
 	} else {
-		return errors.Collection(errors.Errorf(
-			errors.CodeInternal, ctx, "Cannot assign %T to %T", jws, outputElem.Interface(),
-		))
+		return errors.Errorf(
+			errors.CodeInternal, ctx, "Cannot assign", "Cannot assign %T to %T", jws, outputElem.Interface(),
+		)
 	}
 
 	return nil
 }
 
-// coerceString attempts to coerce a string containing a compact JWS into a *jose.JWS and returns ValidationErrorCollection.
-// This method will return a non-nil empty collection if there are no errors.
-func (ruleSet *JWSRuleSet) coerce(value any, ctx context.Context) (*jose.JWS, errors.ValidationErrorCollection) {
+// coerce attempts to coerce a string containing a compact JWS into a *jose.JWS and returns a ValidationError on failure.
+func (ruleSet *JWSRuleSet) coerce(value any, ctx context.Context) (*jose.JWS, errors.ValidationError) {
 	parts := strings.Split(value.(string), ".")
 
-	allErrors := errors.Collection()
+	var errs []error
 
 	if len(parts) < 2 {
-		allErrors = append(allErrors, errors.Errorf(errors.CodePattern, ctx, "Missing payload"))
-		return nil, allErrors
+		errs = append(errs, errors.Errorf(errors.CodePattern, ctx, "Missing payload", "Missing payload"))
+		return nil, errors.Join(errs...)
 	}
 	if len(parts) > 3 {
-		allErrors = append(allErrors, errors.Errorf(errors.CodePattern, ctx, "Expected at most 3 parts, got %d", len(parts)))
-		return nil, allErrors
+		errs = append(errs, errors.Errorf(errors.CodePattern, ctx, "Expected at most 3 parts", "Expected at most 3 parts, got %d", len(parts)))
+		return nil, errors.Join(errs...)
 	}
 
 	_, err := base64url.Decode(parts[0])
 	if err != nil {
 		headerCtx := rulecontext.WithPathString(ctx, "header")
-		allErrors = append(allErrors, errors.Errorf(errors.CodePattern, headerCtx, "Header must be Base64 URL encoded."))
+		errs = append(errs, errors.Errorf(errors.CodePattern, headerCtx, "Header must be Base64 URL encoded", "Header must be Base64 URL encoded."))
 	}
 
 	_, err = base64url.Decode(parts[1])
 	if err != nil {
 		payloadCtx := rulecontext.WithPathString(ctx, "payload")
-		allErrors = append(allErrors, errors.Errorf(errors.CodePattern, payloadCtx, "Payload must be Base64 URL encoded."))
+		errs = append(errs, errors.Errorf(errors.CodePattern, payloadCtx, "Payload must be Base64 URL encoded", "Payload must be Base64 URL encoded."))
 	}
 
 	jws := jose.JWS{
@@ -121,36 +120,39 @@ func (ruleSet *JWSRuleSet) coerce(value any, ctx context.Context) (*jose.JWS, er
 		_, err = base64url.Decode(parts[2])
 		if err != nil {
 			signatureCtx := rulecontext.WithPathString(ctx, "signature")
-			allErrors = append(allErrors, errors.Errorf(errors.CodePattern, signatureCtx, "Signature must be Base64 URL encoded."))
+			errs = append(errs, errors.Errorf(errors.CodePattern, signatureCtx, "Signature must be Base64 URL encoded", "Signature must be Base64 URL encoded."))
 		}
 	} else if !jose.None() {
 		signatureCtx := rulecontext.WithPathString(ctx, "signature")
-		allErrors = append(allErrors, errors.Errorf(errors.CodePattern, signatureCtx, "Signature is required."))
+		errs = append(errs, errors.Errorf(errors.CodePattern, signatureCtx, "Signature is required", "Signature is required."))
 	}
 
-	return &jws, allErrors
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+	return &jws, nil
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
-// same type or a ValidationErrorCollection.
-func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors.ValidationErrorCollection {
+// same type or a ValidationError.
+func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors.ValidationError {
 	headerCtx := rulecontext.WithPathString(ctx, "header")
 	signatureCtx := rulecontext.WithPathString(ctx, "signature")
 	protectedCtx := rulecontext.WithPathString(ctx, "protected")
 	payloadCtx := rulecontext.WithPathString(ctx, "payload")
 
-	allErrors := errors.Collection()
+	var errs []error
 
 	// If signatures is present: Signature, Header, and Protected must not be
 	if value.Signatures != nil {
 		if value.Signature != "" {
-			allErrors = append(allErrors, errors.Errorf(errors.CodeNotAllowed, signatureCtx, "Signature is not allowed when signatures are present."))
+			errs = append(errs, errors.Errorf(errors.CodeNotAllowed, signatureCtx, "Signature not allowed", "Signature is not allowed when signatures are present."))
 		}
 		if value.Header != nil {
-			allErrors = append(allErrors, errors.Errorf(errors.CodeNotAllowed, headerCtx, "Header is not allowed when signatures are present."))
+			errs = append(errs, errors.Errorf(errors.CodeNotAllowed, headerCtx, "Header not allowed", "Header is not allowed when signatures are present."))
 		}
 		if value.Protected != "" {
-			allErrors = append(allErrors, errors.Errorf(errors.CodeNotAllowed, protectedCtx, "Protected is not allowed when signatures are present."))
+			errs = append(errs, errors.Errorf(errors.CodeNotAllowed, protectedCtx, "Protected not allowed", "Protected is not allowed when signatures are present."))
 		}
 	}
 
@@ -161,15 +163,14 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors
 	if value.Protected != "" {
 		_, err := base64url.Decode(value.Protected)
 		if err != nil {
-			allErrors = append(allErrors, errors.Errorf(errors.CodePattern, protectedCtx, "Protected must be Base64 URL encoded."))
+			errs = append(errs, errors.Errorf(errors.CodePattern, protectedCtx, "Protected must be Base64 URL encoded", "Protected must be Base64 URL encoded."))
 		}
 	}
 
 	if value.Header != nil {
 		var header any
-		headerErrors := baseHeaderRuleSet.Apply(ctx, value.Header, &header)
-		if headerErrors != nil {
-			allErrors = append(allErrors, headerErrors...)
+		if headerErr := baseHeaderRuleSet.Apply(ctx, value.Header, &header); headerErr != nil {
+			errs = append(errs, headerErr)
 		}
 	}
 
@@ -178,7 +179,7 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors
 	if value.Payload != "" {
 		_, err := base64url.Decode(value.Payload)
 		if err != nil {
-			allErrors = append(allErrors, errors.Errorf(errors.CodePattern, payloadCtx, "Payload must be Base64 URL encoded."))
+			errs = append(errs, errors.Errorf(errors.CodePattern, payloadCtx, "Payload must be Base64 URL encoded", "Payload must be Base64 URL encoded."))
 		}
 	}
 
@@ -193,15 +194,15 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors
 
 	for currentRuleSet != nil {
 		if currentRuleSet.rule != nil {
-			if errs := currentRuleSet.rule.Evaluate(ctx, value); errs != nil {
-				allErrors = append(allErrors, errs...)
+			if err := currentRuleSet.rule.Evaluate(ctx, value); err != nil {
+				errs = append(errs, err)
 			}
 		}
 		currentRuleSet = currentRuleSet.parent
 	}
 
-	if len(allErrors) > 0 {
-		return allErrors
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }

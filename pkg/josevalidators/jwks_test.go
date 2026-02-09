@@ -7,6 +7,7 @@ import (
 
 	"proto.zip/studio/jose/pkg/jose"
 	"proto.zip/studio/jose/pkg/josevalidators"
+	"proto.zip/studio/validate/pkg/errors"
 	"proto.zip/studio/validate/pkg/rules"
 	"proto.zip/studio/validate/pkg/testhelpers"
 )
@@ -42,4 +43,38 @@ func TestJWKSBasic(t *testing.T) {
 	const jwksJSON = `{"keys":[{"kty":"EC","crv":"P-256","kid":"EC20240131","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}]}`
 	ruleSet := josevalidators.NewJWKS()
 	testProcessJWKS(t, jwksJSON, ruleSet)
+}
+
+func TestJWKSRuleSet_WithRequired(t *testing.T) {
+	rs := josevalidators.NewJWKS().WithRequired()
+	if rs == nil {
+		t.Fatal("WithRequired returned nil")
+	}
+}
+
+func TestJWKSRuleSet_Evaluate(t *testing.T) {
+	ctx := context.Background()
+	jwk, _ := jose.NewJWK(`{"kty":"EC","crv":"P-256","use":"sig","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`)
+	jwks := jose.NewJWKS(jwk)
+	err := josevalidators.NewJWKS().Evaluate(ctx, jwks)
+	if err != nil {
+		t.Errorf("Evaluate: %v", err)
+	}
+}
+
+func TestJWKSRuleSet_WithRule_WithRuleFunc(t *testing.T) {
+	rs := josevalidators.NewJWKS().
+		WithRuleFunc(func(_ context.Context, _ *jose.JWKS) errors.ValidationError {
+			return nil
+		})
+	if rs == nil {
+		t.Fatal("WithRuleFunc returned nil")
+	}
+}
+
+func TestJWKSRuleSet_String(t *testing.T) {
+	s := josevalidators.NewJWKS().String()
+	if s != "" {
+		t.Errorf("String() = %q", s)
+	}
 }

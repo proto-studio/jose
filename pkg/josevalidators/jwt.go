@@ -37,8 +37,8 @@ func (ruleSet *JWTRuleSet) WithRequired() *JWTRuleSet {
 }
 
 // Apply performs a validation of a RuleSet against a value and returns a JWT value or
-// a ValidationErrorCollection.
-func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationErrorCollection {
+// a ValidationError.
+func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationError {
 	var jws *jose.JWS
 	if err := ruleSet.inner.Apply(ctx, input, &jws); err != nil {
 		return err
@@ -46,9 +46,7 @@ func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.
 
 	jwt, conversionErr := jose.JWTFromJWS(jws)
 	if conversionErr != nil {
-		return errors.Collection(
-			errors.Errorf(errors.CodeType, ctx, "Unable to convert JWS to JWT"),
-		)
+		return errors.Errorf(errors.CodeType, ctx, "Unable to convert JWS to JWT", "Unable to convert JWS to JWT")
 	}
 
 	var newClaims map[string]any
@@ -75,20 +73,20 @@ func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.
 	} else if outputElem.Type().AssignableTo(reflect.TypeOf(*jws)) {
 		outputElem.Set(reflect.ValueOf(*jws))
 	} else {
-		return errors.Collection(errors.Errorf(
-			errors.CodeInternal, ctx, "Cannot assign %T to %T", jwt, outputElem.Interface(),
-		))
+		return errors.Errorf(
+			errors.CodeInternal, ctx, "Cannot assign", "Cannot assign %T to %T", jwt, outputElem.Interface(),
+		)
 	}
 
 	return nil
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
-// same type or a ValidationErrorCollection.
-func (ruleSet *JWTRuleSet) Evaluate(ctx context.Context, value *jose.JWT) errors.ValidationErrorCollection {
+// same type or a ValidationError.
+func (ruleSet *JWTRuleSet) Evaluate(ctx context.Context, value *jose.JWT) errors.ValidationError {
 	jws, jwsErr := value.JWS()
 	if jwsErr != nil {
-		return errors.Collection(errors.Errorf(errors.CodeType, ctx, "Unable to get JWS from JWT"))
+		return errors.Errorf(errors.CodeType, ctx, "Unable to get JWS from JWT", "Unable to get JWS from JWT")
 	}
 	if err := ruleSet.inner.Evaluate(ctx, jws); err != nil {
 		return err

@@ -2,6 +2,7 @@ package jose_test
 
 import (
 	"errors"
+	"testing"
 
 	"proto.zip/studio/jose/internal/base64url"
 	"proto.zip/studio/jose/pkg/jose"
@@ -53,4 +54,20 @@ func (alg *mockAlgorithm) Sign(_ string, payload []byte) (*jose.Signature, error
 
 func (alg *mockAlgorithm) Name() string {
 	return "MOCK"
+}
+
+func TestAlgorithmsStoreFunc(t *testing.T) {
+	var called bool
+	fn := jose.AlgorithmsStoreFunc(func(head *jose.Header) []jose.Algorithm {
+		called = true
+		return nil
+	})
+	h := jose.Header{"alg": "ES256"}
+	out := fn.AlgorithmsFor(&h)
+	if !called {
+		t.Error("AlgorithmsFor did not call the func")
+	}
+	if out != nil {
+		t.Errorf("AlgorithmsFor returned %v, want nil", out)
+	}
 }

@@ -7,6 +7,7 @@ import (
 
 	"proto.zip/studio/jose/pkg/jose"
 	"proto.zip/studio/jose/pkg/josevalidators"
+	"proto.zip/studio/validate/pkg/errors"
 	"proto.zip/studio/validate/pkg/rules"
 	"proto.zip/studio/validate/pkg/testhelpers"
 )
@@ -30,8 +31,8 @@ func testProcessJWK(t testing.TB, jwkJSON string, ruleSet rules.RuleSet[*jose.JW
 	}
 
 	// If the JSON is valid, call the provided function
-	if errs := ruleSet.Apply(context.Background(), jwk, &jose.JWK{}); len(errs) > 0 {
-		t.Errorf("Apply function returned errors: %v", errs)
+	if err := ruleSet.Apply(context.Background(), jwk, &jose.JWK{}); err != nil {
+		t.Errorf("Apply function returned errors: %v", err)
 	}
 }
 
@@ -43,4 +44,55 @@ func TestES256(t *testing.T) {
 	validator := josevalidators.JWK()
 
 	testProcessJWK(t, jwkJson, validator)
+}
+
+func TestJWKRuleSet_Required(t *testing.T) {
+	rs := josevalidators.JWK()
+	if rs.Required() {
+		t.Error("default Required() should be false")
+	}
+}
+
+func TestJWKRuleSet_WithRequired(t *testing.T) {
+	rs := josevalidators.JWK().WithRequired()
+	if rs == nil {
+		t.Fatal("WithRequired returned nil")
+	}
+	if !rs.Required() {
+		t.Error("WithRequired().Required() should be true")
+	}
+}
+
+func TestJWKRuleSet_Evaluate(t *testing.T) {
+	ctx := context.Background()
+	// Use a JWK that satisfies validators (kty, use allowed values, etc.)
+	jwk, _ := jose.NewJWK(`{"kty":"EC","crv":"P-256","use":"sig","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`)
+	err := josevalidators.JWK().Evaluate(ctx, jwk)
+	if err != nil {
+		t.Errorf("Evaluate: %v", err)
+	}
+}
+
+func TestJWKRuleSet_WithRule_WithRuleFunc(t *testing.T) {
+	rs := josevalidators.JWK().
+		WithRuleFunc(func(_ context.Context, _ *jose.JWK) errors.ValidationError {
+			return nil
+		})
+	if rs == nil {
+		t.Fatal("WithRuleFunc returned nil")
+	}
+}
+
+func TestJWKRuleSet_Any(t *testing.T) {
+	anySet := josevalidators.JWK().Any()
+	if anySet == nil {
+		t.Fatal("Any() returned nil")
+	}
+}
+
+func TestJWKRuleSet_String(t *testing.T) {
+	s := josevalidators.JWK().String()
+	if s != "JWKRuleSet" {
+		t.Errorf("String() = %q", s)
+	}
 }

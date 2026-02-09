@@ -16,10 +16,10 @@ const compactString string = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.2_LNHFdcd
 func checkJWS(b, a any) error {
 	jws, ok := a.(*jose.JWS)
 	if !ok {
-		return errors.Errorf(errors.CodeInternal, context.Background(), "Expected *jose.JWS, got %T", a)
+		return errors.Errorf(errors.CodeInternal, context.Background(), "type mismatch", "Expected *jose.JWS, got %T", a)
 	}
 	if jws == nil {
-		return errors.Errorf(errors.CodeInternal, context.Background(), "Expected jws to be non-nil")
+		return errors.Errorf(errors.CodeInternal, context.Background(), "nil jws", "Expected jws to be non-nil")
 	}
 	return nil
 }
@@ -123,13 +123,16 @@ func TestBase64URL(t *testing.T) {
 
 	err := testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
-		valErr := err.(errors.ValidationErrorCollection)
-
-		if l := len(valErr); l != 1 {
-			t.Errorf("Expected %d error, got %s", 1, err)
-
+		valErr := err.(errors.ValidationError)
+		unwrap := errors.Unwrap(valErr)
+		l := len(unwrap)
+		if l == 0 {
+			l = 1
 		}
-		if p := valErr.First().Path(); p != "/header" {
+		if l != 1 {
+			t.Errorf("Expected %d error, got %s", 1, err)
+		}
+		if p := valErr.Path(); p != "/header" {
 			t.Errorf("Expected path to be %s, got %s", "/header", p)
 		}
 	}
@@ -140,13 +143,16 @@ func TestBase64URL(t *testing.T) {
 
 	err = testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
-		valErr := err.(errors.ValidationErrorCollection)
-
-		if l := len(valErr); l != 1 {
-			t.Errorf("Expected %d error, got %s", 1, err)
-
+		valErr := err.(errors.ValidationError)
+		unwrap := errors.Unwrap(valErr)
+		l := len(unwrap)
+		if l == 0 {
+			l = 1
 		}
-		if p := valErr.First().Path(); p != "/payload" {
+		if l != 1 {
+			t.Errorf("Expected %d error, got %s", 1, err)
+		}
+		if p := valErr.Path(); p != "/payload" {
 			t.Errorf("Expected path to be %s, got %s", "/payload", p)
 		}
 	}
@@ -156,13 +162,16 @@ func TestBase64URL(t *testing.T) {
 
 	err = testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
-		valErr := err.(errors.ValidationErrorCollection)
-
-		if l := len(valErr); l != 1 {
-			t.Errorf("Expected %d error, got %s", 1, err)
-
+		valErr := err.(errors.ValidationError)
+		unwrap := errors.Unwrap(valErr)
+		l := len(unwrap)
+		if l == 0 {
+			l = 1
 		}
-		if p := valErr.First().Path(); p != "/signature" {
+		if l != 1 {
+			t.Errorf("Expected %d error, got %s", 1, err)
+		}
+		if p := valErr.Path(); p != "/signature" {
 			t.Errorf("Expected path to be %s, got %s", "/signature", p)
 		}
 	}
@@ -171,9 +180,13 @@ func TestBase64URL(t *testing.T) {
 
 	err = testhelpers.MustNotApply(t, ruleSet.Any(), strings.Join(parts, "."), errors.CodePattern)
 	if err != nil {
-		valErr := err.(errors.ValidationErrorCollection)
-
-		if l := len(valErr); l != 2 {
+		valErr := err.(errors.ValidationError)
+		unwrap := errors.Unwrap(valErr)
+		l := len(unwrap)
+		if l == 0 {
+			l = 1
+		}
+		if l != 2 {
 			t.Errorf("Expected %d error, got %s", 2, err)
 		}
 	}
@@ -194,5 +207,70 @@ func TestVerify(t *testing.T) {
 	if verr != nil {
 		t.Errorf("Expected validation errors to be ni, got: %s", verr)
 	}
+}
 
+func TestJWSRuleSet_Required(t *testing.T) {
+	rs := josevalidators.JWS()
+	if rs.Required() {
+		t.Error("default Required() should be false")
+	}
+}
+
+func TestJWSRuleSet_WithRequired(t *testing.T) {
+	rs := josevalidators.JWS().WithRequired()
+	if rs == nil {
+		t.Fatal("WithRequired returned nil")
+	}
+	if !rs.Required() {
+		t.Error("WithRequired().Required() should be true")
+	}
+}
+
+func TestJWSRuleSet_WithRule_WithRuleFunc(t *testing.T) {
+	rs := josevalidators.JWS().
+		WithRuleFunc(func(_ context.Context, _ *jose.JWS) errors.ValidationError {
+			return nil
+		})
+	if rs == nil {
+		t.Fatal("WithRuleFunc returned nil")
+	}
+}
+
+func TestJWSRuleSet_String(t *testing.T) {
+	s := josevalidators.JWS().String()
+	if s != "JWSRuleSet" {
+		t.Errorf("String() = %q", s)
+	}
+}
+
+func TestJWS_Evaluate_SignaturesAndSignatureSet(t *testing.T) {
+	// When Signatures != nil, having Signature set should add error
+	ctx := context.Background()
+	jws := &jose.JWS{
+		Protected:  "eyJhbGciOiJIUzI1NiJ9",
+		Payload:    "e30",
+		Signature:  "x",
+		Signatures: []jose.Signature{{Protected: "eyJhbGciOiJIUzI1NiJ9", Signature: "x"}},
+	}
+	err := josevalidators.JWS().Evaluate(ctx, jws)
+	if err == nil {
+		t.Error("expected error when both Signature and Signatures set")
+	}
+}
+
+func TestJWS_Apply_NilOutput(t *testing.T) {
+	ctx := context.Background()
+	err := josevalidators.JWS().Apply(ctx, compactString, nil)
+	if err == nil {
+		t.Error("expected error when output is nil")
+	}
+}
+
+func TestJWS_Apply_NonPointerOutput(t *testing.T) {
+	ctx := context.Background()
+	var jws jose.JWS
+	err := josevalidators.JWS().Apply(ctx, compactString, jws)
+	if err == nil {
+		t.Error("expected error when output is not a pointer")
+	}
 }

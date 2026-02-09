@@ -25,6 +25,7 @@ type JWK struct {
 	D   string `json:"d,omitempty" validate:"d"`     // D is the ECC private key value.
 	N   string `json:"n,omitempty" validate:"n"`     // N is the modulus for RSA keys.
 	E   string `json:"e,omitempty" validate:"e"`     // E is the public exponent for RSA keys.
+	K   string `json:"k,omitempty" validate:"k"`     // K is the secret for symmetric keys.
 }
 
 func NewJWK(data interface{}) (*JWK, error) {
