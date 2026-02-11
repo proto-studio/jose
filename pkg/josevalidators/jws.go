@@ -12,16 +12,12 @@ import (
 	"proto.zip/studio/validate/pkg/rules"
 )
 
-// JWSImplementation is an interface that specifies data structures that can be converted to JWS.
-type jwsImplementation interface {
-	JWS() (*jose.JWS, error)
-}
-
 type JWSRuleSet struct {
 	rules.NoConflict[*jose.JWS]
 	required bool
 	parent   *JWSRuleSet
 	rule     rules.Rule[*jose.JWS]
+	label    string // for String(); e.g. "WithRequired()", rule.String()
 }
 
 // JWS creates a new jose.JWS RuleSet.
@@ -44,6 +40,7 @@ func (ruleSet *JWSRuleSet) WithRequired() *JWSRuleSet {
 	return &JWSRuleSet{
 		required: true,
 		parent:   ruleSet,
+		label:    "WithRequired()",
 	}
 }
 
@@ -207,17 +204,53 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors
 	return nil
 }
 
+// noConflict returns a new chain with any node that the checker replaces removed.
+// Used so that conflicting rules (e.g. WithJWK vs WithJWKS) keep only the latest.
+func (ruleSet *JWSRuleSet) noConflict(checker rules.Rule[*jose.JWS]) *JWSRuleSet {
+	conflicts := false
+	if ruleSet.rule != nil && checker.Replaces(ruleSet.rule) {
+		conflicts = true
+	}
+	if conflicts {
+		if ruleSet.parent == nil {
+			return nil
+		}
+		return ruleSet.parent.noConflict(checker)
+	}
+	if ruleSet.parent == nil {
+		return ruleSet
+	}
+	newParent := ruleSet.parent.noConflict(checker)
+	if newParent == ruleSet.parent {
+		return ruleSet
+	}
+	return &JWSRuleSet{
+		parent:   newParent,
+		required: ruleSet.required,
+		rule:     ruleSet.rule,
+		label:    ruleSet.label,
+	}
+}
+
+// withRuleAndLabel returns a new child rule set with the rule and an explicit label.
+// Built-in methods (WithJWK, WithJWKS, WithJWKSURL, WithVerifyFunc) use this so the label is on the RuleSet.
+func (ruleSet *JWSRuleSet) withRuleAndLabel(rule rules.Rule[*jose.JWS], label string) *JWSRuleSet {
+	return &JWSRuleSet{
+		parent:   ruleSet.noConflict(rule),
+		required: ruleSet.required,
+		rule:     rule,
+		label:    label,
+	}
+}
+
 // WithRule returns a new child rule set with a rule added to the list of
 // rules to evaluate. WithRule takes an implementation of the Rule interface
-// for the jose.JWT type.
+// for the jose.JWS type. If the rule implements Replaces, any ancestor rule
+// it replaces is removed from the chain (latest wins).
 //
 // Use this when implementing custom rules.
 func (ruleSet *JWSRuleSet) WithRule(rule rules.Rule[*jose.JWS]) *JWSRuleSet {
-	return &JWSRuleSet{
-		parent:   ruleSet,
-		required: ruleSet.required,
-		rule:     rule,
-	}
+	return ruleSet.withRuleAndLabel(rule, rule.String())
 }
 
 // WithRuleFunc returns a new child rule set with a rule added to the list of
@@ -235,7 +268,22 @@ func (ruleSet *JWSRuleSet) Any() rules.RuleSet[any] {
 	return rules.WrapAny[*jose.JWS](ruleSet)
 }
 
-// String returns a string representation of the rule set suitable for debugging.
+// String returns a string representation of the rule set suitable for debugging,
+// e.g. "JWSRuleSet", "JWSRuleSet.WithRequired()", "JWSRuleSet.WithJWK()".
 func (ruleSet *JWSRuleSet) String() string {
-	return "JWSRuleSet"
+	const base = "JWSRuleSet"
+	var labels []string
+	for n := ruleSet; n != nil; n = n.parent {
+		if n.label != "" {
+			labels = append(labels, n.label)
+		}
+	}
+	// labels are leaf-first; we want root-to-leaf for display
+	for i, j := 0, len(labels)-1; i < j; i, j = i+1, j-1 {
+		labels[i], labels[j] = labels[j], labels[i]
+	}
+	if len(labels) == 0 {
+		return base
+	}
+	return base + "." + strings.Join(labels, ".")
 }

@@ -3,6 +3,7 @@ package josevalidators_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"proto.zip/studio/jose/pkg/jose"
@@ -91,8 +92,20 @@ func TestJWKRuleSet_Any(t *testing.T) {
 }
 
 func TestJWKRuleSet_String(t *testing.T) {
-	s := josevalidators.JWK().String()
-	if s != "JWKRuleSet" {
-		t.Errorf("String() = %q", s)
+	// Base rule set
+	if s := josevalidators.JWK().String(); s != "JWKRuleSet" {
+		t.Errorf("JWK().String() = %q, want JWKRuleSet", s)
+	}
+	// WithRequired shows in chain
+	rs := josevalidators.JWK().WithRequired()
+	if s := rs.String(); s != "JWKRuleSet.WithRequired()" {
+		t.Errorf("JWK().WithRequired().String() = %q, want JWKRuleSet.WithRequired()", s)
+	}
+	// WithRule adds a label (exact format from rules package may vary)
+	rs = josevalidators.JWK().WithRuleFunc(func(_ context.Context, _ *jose.JWK) errors.ValidationError {
+		return nil
+	})
+	if s := rs.String(); !strings.HasPrefix(s, "JWKRuleSet.") {
+		t.Errorf("JWK().WithRuleFunc().String() = %q, want prefix JWKRuleSet.", s)
 	}
 }

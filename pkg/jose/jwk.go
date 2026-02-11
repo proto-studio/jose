@@ -128,10 +128,13 @@ func newJWKFromRSAPublicKey(pubKey interface{}) (*JWK, error) {
 	return jwk, nil
 }
 
+// jsonMarshalJWK is a hook for tests to simulate Marshal failure.
+var jsonMarshalJWK = json.Marshal
+
 func (j *JWK) String() string {
-	data, err := json.Marshal(j)
+	data, err := jsonMarshalJWK(j)
 	if err != nil {
-		return "{}" // or you can handle this differently
+		return "{}"
 	}
 	return string(data)
 }

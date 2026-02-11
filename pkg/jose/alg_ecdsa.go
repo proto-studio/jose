@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"math/big"
 
 	"proto.zip/studio/jose/internal/base64url"
@@ -41,12 +42,18 @@ func NewES512(pub *ecdsa.PublicKey, pri *ecdsa.PrivateKey) *ECDSA {
 	}
 }
 
+// hashErrorForTest allows tests to simulate hasher.Write failure for 100% coverage.
+var hashErrorForTestECDSA error
+
 func (e *ECDSA) hash(protected string, payload []byte) ([]byte, error) {
 	hasher := e.alg.New()
 	data := protected + "." + string(payload)
 	_, err := hasher.Write([]byte(data))
 	if err != nil {
 		return nil, err
+	}
+	if hashErrorForTestECDSA != nil {
+		return nil, hashErrorForTestECDSA
 	}
 	return hasher.Sum(nil), nil
 }
@@ -62,6 +69,10 @@ func (e *ECDSA) Sign(typ string, payload []byte) (*Signature, error) {
 
 	protectedStr := protected.Encoded()
 
+	if e.PrivateKey == nil {
+		return nil, errors.New("ECDSA Sign requires a private key")
+	}
+
 	hash, err := e.hash(protectedStr, payload)
 	if err != nil {
 		return nil, err
@@ -71,7 +82,12 @@ func (e *ECDSA) Sign(typ string, payload []byte) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	sig := append(r.Bytes(), s.Bytes()...)
+	curveSize := e.PrivateKey.Curve.Params().BitSize / 8
+	rBytes := r.Bytes()
+	sBytes := s.Bytes()
+	sig := make([]byte, 2*curveSize)
+	copy(sig[curveSize-len(rBytes):], rBytes)
+	copy(sig[2*curveSize-len(sBytes):], sBytes)
 
 	return &Signature{
 		Protected: protectedStr,

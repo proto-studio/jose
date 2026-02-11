@@ -2,6 +2,7 @@ package josevalidators
 
 import (
 	"context"
+	"strings"
 
 	"proto.zip/studio/jose/pkg/jose"
 	"proto.zip/studio/validate/pkg/errors"
@@ -10,7 +11,9 @@ import (
 
 type JWKRuleSet struct {
 	rules.NoConflict[*jose.JWK]
-	inner *rules.ObjectRuleSet[*jose.JWK, string, any]
+	inner  *rules.ObjectRuleSet[*jose.JWK, string, any]
+	parent *JWKRuleSet
+	label  string // for String(); e.g. "WithRequired()", rule.String()
 }
 
 var baseJwkRuleSet *rules.ObjectRuleSet[*jose.JWK, string, any] = rules.Struct[*jose.JWK]().
@@ -42,7 +45,9 @@ func (ruleSet *JWKRuleSet) Required() bool {
 // Use WithRequired when nesting a RuleSet and the a value is not allowed to be omitted.
 func (ruleSet *JWKRuleSet) WithRequired() *JWKRuleSet {
 	return &JWKRuleSet{
-		inner: ruleSet.inner.WithRequired(),
+		inner:  ruleSet.inner.WithRequired(),
+		parent: ruleSet,
+		label:  "WithRequired()",
 	}
 }
 
@@ -64,7 +69,9 @@ func (ruleSet *JWKRuleSet) Evaluate(ctx context.Context, value *jose.JWK) errors
 // Use this when implementing custom rules.
 func (ruleSet *JWKRuleSet) WithRule(rule rules.Rule[*jose.JWK]) *JWKRuleSet {
 	return &JWKRuleSet{
-		inner: ruleSet.inner.WithRule(rule),
+		inner:  ruleSet.inner.WithRule(rule),
+		parent: ruleSet,
+		label:  rule.String(),
 	}
 }
 
@@ -83,7 +90,21 @@ func (ruleSet *JWKRuleSet) Any() rules.RuleSet[any] {
 	return rules.WrapAny[*jose.JWK](ruleSet.inner)
 }
 
-// String returns a string representation of the rule set suitable for debugging.
+// String returns a string representation of the rule set suitable for debugging,
+// e.g. "JWKRuleSet", "JWKRuleSet.WithRequired()".
 func (ruleSet *JWKRuleSet) String() string {
-	return "JWKRuleSet"
+	const base = "JWKRuleSet"
+	var labels []string
+	for n := ruleSet; n != nil; n = n.parent {
+		if n.label != "" {
+			labels = append(labels, n.label)
+		}
+	}
+	for i, j := 0, len(labels)-1; i < j; i, j = i+1, j-1 {
+		labels[i], labels[j] = labels[j], labels[i]
+	}
+	if len(labels) == 0 {
+		return base
+	}
+	return base + "." + strings.Join(labels, ".")
 }

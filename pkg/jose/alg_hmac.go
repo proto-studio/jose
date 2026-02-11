@@ -3,6 +3,7 @@ package jose
 import (
 	"crypto"
 	"crypto/hmac"
+	"errors"
 
 	"proto.zip/studio/jose/internal/base64url"
 )
@@ -34,7 +35,17 @@ func NewH256(secret []byte) *HMAC {
 	}
 }
 
+func NewHS512(secret []byte) *HMAC {
+	return &HMAC{
+		secret: secret,
+		alg:    crypto.SHA512,
+	}
+}
+
 func (h *HMAC) signWithProtected(protected string, payload []byte) (*Signature, error) {
+	if h.secret == nil {
+		return nil, errors.New("HMAC requires secret")
+	}
 	hmacFunc := hmac.New(h.alg.New, h.secret)
 	hmacFunc.Write([]byte(protected))
 	hmacFunc.Write([]byte("."))

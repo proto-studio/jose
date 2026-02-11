@@ -1,9 +1,13 @@
 package jose_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"strings"
 	"testing"
 
+	"proto.zip/studio/jose/internal/base64url"
 	"proto.zip/studio/jose/pkg/jose"
 )
 
@@ -108,6 +112,37 @@ func TestJWS_SignWithType_NoAlg(t *testing.T) {
 	}
 }
 
+// Test SignWithType when JWS already has flat signature (add second alg → expand to Signatures).
+func TestJWS_SignWithType_ExpandFromFlat(t *testing.T) {
+	alg := jose.NewHS256([]byte("s"))
+	jws := &jose.JWS{Payload: "e30"}
+	err := jws.SignWithType("JWT", alg)
+	if err != nil {
+		t.Fatalf("first Sign: %v", err)
+	}
+	// Add one more signature: should move current to Signatures and append one
+	err = jws.SignWithType("JWT", alg)
+	if err != nil {
+		t.Fatalf("second Sign: %v", err)
+	}
+	if jws.Signatures == nil || len(jws.Signatures) != 2 {
+		t.Errorf("expected Signatures len 2, got %v", jws.Signatures)
+	}
+}
+
+// SignWithType with multiple algs on empty JWS (no prior signature) hits len(alg)>1 branch.
+func TestJWS_SignWithType_MultipleAlgsEmpty(t *testing.T) {
+	alg := jose.NewHS256([]byte("s"))
+	jws := &jose.JWS{Payload: "e30"}
+	err := jws.SignWithType("JWT", alg, alg)
+	if err != nil {
+		t.Fatalf("SignWithType: %v", err)
+	}
+	if jws.Signatures == nil || len(jws.Signatures) != 2 {
+		t.Errorf("expected Signatures len 2, got %v", jws.Signatures)
+	}
+}
+
 func TestJWS_SignWithType_EmptyType(t *testing.T) {
 	alg := jose.NewHS256([]byte("s"))
 	jws := &jose.JWS{Payload: "p"}
@@ -157,6 +192,19 @@ func TestJWS_Compact_UnprotectedHeader(t *testing.T) {
 	}
 }
 
+// Compact when Signature is set returns three-part string (else branch).
+func TestJWS_Compact_ThreePartReturn(t *testing.T) {
+	jws := &jose.JWS{Protected: "e30", Payload: "e30", Signature: "e30"}
+	s, err := jws.Compact()
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	parts := strings.Split(s, ".")
+	if len(parts) != 3 || parts[0] != "e30" || parts[1] != "e30" || parts[2] != "e30" {
+		t.Errorf("Compact() = %q, want three parts e30.e30.e30", s)
+	}
+}
+
 func TestJWS_Flatten_MultipleSignatures(t *testing.T) {
 	alg := jose.NewHS256([]byte("s"))
 	jws := &jose.JWS{Payload: "e30"}
@@ -203,6 +251,56 @@ func TestJWS_Verify_InvalidProtected(t *testing.T) {
 	}
 }
 
+func TestJWS_FullHeader_InvalidProtected(t *testing.T) {
+	jws := &jose.JWS{Protected: "!!!", Payload: "e30"}
+	_, err := jws.FullHeader()
+	if err == nil {
+		t.Error("FullHeader with invalid base64 protected should error")
+	}
+}
+
+func TestJWS_FullHeader_InvalidJSONInProtected(t *testing.T) {
+	// Valid base64 but content is not JSON
+	notJSON := base64url.Encode([]byte("not json"))
+	jws := &jose.JWS{Protected: notJSON, Payload: "e30"}
+	_, err := jws.FullHeader()
+	if err == nil {
+		t.Error("FullHeader with non-JSON protected should error")
+	}
+}
+
+func TestJWS_Verify_NoAlgInHeader(t *testing.T) {
+	// Protected with no "alg" → Algorithm("") fails
+	jwk, _ := jose.NewJWK(`{"kty":"RSA","n":"n","e":"AQAB"}`)
+	// e30 = {} so header is empty
+	jws := &jose.JWS{Protected: "e30", Payload: "e30", Signature: "e30"}
+	if jws.Verify(jwk) {
+		t.Error("Verify with no alg in header should be false")
+	}
+}
+
+// Verify when header has alg that Algorithm rejects (e.g. unsupported) → alg == nil || err != nil.
+func TestJWS_Verify_UnsupportedAlgInHeader(t *testing.T) {
+	jwk, _ := jose.NewJWK(`{"kty":"RSA","n":"n","e":"AQAB"}`)
+	// Header with alg "INVALID" so Algorithm returns (nil, err)
+	prot := base64url.Encode([]byte(`{"alg":"INVALID","typ":"JWT"}`))
+	jws := &jose.JWS{Protected: prot, Payload: "e30", Signature: "e30"}
+	if jws.Verify(jwk) {
+		t.Error("Verify with unsupported alg in header should be false")
+	}
+}
+
+// SignWithType when alg.Sign returns error (e.g. nil private key) propagates error.
+func TestJWS_SignWithType_AlgSignError(t *testing.T) {
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	jws := &jose.JWS{Payload: "e30"}
+	alg := jose.NewES256(&key.PublicKey, nil) // no private key
+	err := jws.SignWithType("JWT", alg)
+	if err == nil {
+		t.Fatal("SignWithType with alg that cannot sign should error")
+	}
+}
+
 func TestJWS_Verify_ValidRSACompact(t *testing.T) {
 	// Use same token and JWK as josevalidators TestVerify to hit Verify path
 	jwk, err := jose.NewJWK(`{"kty":"RSA","kid":"RSA20240212","n":"y4hxdh_gsACZsZpUg-l4hpdf5Qo4lUyJV1SbJRsJuqRLKTZHYhrTJ1uUDfIYNcNeemxL73zytN6SfJvBgDYThqN2OTrX_G1LMadI_CtKrV-kUZXjyY41KAcgHvPuVhhWX3ksYaKqVijT7ViOS3DG3t7AKVsD_BBIzxQ_ZaQLKG5YmG64xL6WGNdpTrBeT87-ZJ9-ojhhP2eytkjLhB6aO5kzIiXRsN_b0A0ubm2ujKkBP4tnsGGcbJzwlappWJb3qdOYXL77kcFIuxIRsfKCrb5Tuds862jpawKYZdFC_46tJ_CRieHMo-o-6XGmfp_VXvAv2FkRDbqDtnU8_mKvuQ","e":"AQAB"}`)
@@ -214,6 +312,14 @@ func TestJWS_Verify_ValidRSACompact(t *testing.T) {
 	jws := &jose.JWS{Protected: parts[0], Payload: parts[1], Signature: parts[2]}
 	if !jws.Verify(jwk) {
 		t.Error("Verify(jwk) = false, want true")
+	}
+}
+
+func TestJWS_Verify_NoSignatureNorSignatures(t *testing.T) {
+	jwk, _ := jose.NewJWK(`{"kty":"RSA","n":"n","e":"AQAB"}`)
+	jws := &jose.JWS{Protected: "eyJhbGciOiJSUzI1NiJ9", Payload: "e30"} // no Signature, no Signatures
+	if jws.Verify(jwk) {
+		t.Error("Verify with no signature should be false")
 	}
 }
 
@@ -229,5 +335,16 @@ func TestJWS_Verify_ExpandedSignaturesPath(t *testing.T) {
 	}
 	if !jws.Verify(jwk) {
 		t.Error("Verify(jwk) with Signatures = false, want true")
+	}
+}
+
+// Verify with Signatures != nil but wrong JWK so no signature matches → return false.
+func TestJWS_Verify_ExpandedForm_NoMatch(t *testing.T) {
+	alg := jose.NewHS256([]byte("secret"))
+	jws := &jose.JWS{Payload: "e30"}
+	_ = jws.SignWithType("JWT", alg, alg) // expanded form with 2 sigs
+	otherJWK, _ := jose.NewJWK(`{"kty":"RSA","n":"n","e":"AQAB"}`) // different key
+	if jws.Verify(otherJWK) {
+		t.Error("Verify with wrong JWK (expanded form) should be false")
 	}
 }

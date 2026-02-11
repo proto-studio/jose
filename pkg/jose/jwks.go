@@ -31,11 +31,14 @@ func (j *JWKS) GetByKid(kid string) *JWK {
 	return nil
 }
 
+// jsonMarshalJWKS is a hook for tests to simulate Marshal failure.
+var jsonMarshalJWKS = json.Marshal
+
 // String returns the JSON representation of the JWKS.
 func (j *JWKS) String() string {
-	data, err := json.Marshal(j)
+	data, err := jsonMarshalJWKS(j)
 	if err != nil {
-		return "{}" // or handle this differently
+		return "{}"
 	}
 	return string(data)
 }

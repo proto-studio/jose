@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"errors"
 
 	"proto.zip/studio/jose/internal/base64url"
 )
@@ -40,6 +41,9 @@ func NewRS512(pub *rsa.PublicKey, pri *rsa.PrivateKey) *RSA {
 	}
 }
 
+// hashErrorForTest allows tests to simulate hasher.Write failure for 100% coverage.
+var hashErrorForTestRSA error
+
 func (e *RSA) hash(protected string, payload []byte) ([]byte, error) {
 	hasher := sha256.New()
 	data := protected + "." + string(payload)
@@ -47,10 +51,16 @@ func (e *RSA) hash(protected string, payload []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if hashErrorForTestRSA != nil {
+		return nil, hashErrorForTestRSA
+	}
 	return hasher.Sum(nil), nil
 }
 
 func (r *RSA) signWithProtected(protected string, payload []byte) (*Signature, error) {
+	if r.PrivateKey == nil {
+		return nil, errors.New("RSA Sign requires a private key")
+	}
 	hashed, err := r.hash(protected, payload)
 	if err != nil {
 		return nil, err

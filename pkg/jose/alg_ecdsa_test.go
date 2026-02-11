@@ -1,9 +1,11 @@
 package jose
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"testing"
 )
 
@@ -54,6 +56,32 @@ func TestNewES512(t *testing.T) {
 	}
 }
 
+func TestECDSA_Sign_NilPrivateKey(t *testing.T) {
+	_, pub := mustECDSAP256(t)
+	alg := NewES256(pub, nil)
+	_, err := alg.Sign("JWT", []byte("payload"))
+	if err == nil {
+		t.Fatal("Sign with nil PrivateKey should error")
+	}
+}
+
+func TestECDSA_Sign_WithKid(t *testing.T) {
+	priv, pub := mustECDSAP256(t)
+	alg := NewES256(pub, priv)
+	alg.Kid = "my-key-id"
+	sig, err := alg.Sign("JWT", []byte("x"))
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	// Decode protected and check kid is present
+	if sig.Protected == "" {
+		t.Fatal("expected protected header")
+	}
+	if !alg.Verify(sig, []byte("x")) {
+		t.Error("Verify failed")
+	}
+}
+
 func TestECDSA_SignVerify(t *testing.T) {
 	priv, pub := mustECDSAP256(t)
 	alg := NewES256(pub, priv)
@@ -73,12 +101,73 @@ func TestECDSA_SignVerify(t *testing.T) {
 	}
 }
 
+func TestECDSA_Verify_InvalidBase64Sig(t *testing.T) {
+	_, pub := mustECDSAP256(t)
+	alg := NewES256(pub, nil)
+	sig := &Signature{Protected: "e30", Signature: "!!!"}
+	if alg.Verify(sig, []byte("x")) {
+		t.Error("Verify with invalid base64 signature should be false")
+	}
+}
+
 func TestECDSA_VerifyBadSignature(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
 	sig := &Signature{Protected: "e30", Signature: "invalid"}
 	if alg.Verify(sig, []byte("x")) {
 		t.Error("Verify with bad signature should be false")
+	}
+}
+
+func TestECDSA_VerifyWrongSignatureLength(t *testing.T) {
+	_, pub := mustECDSAP256(t)
+	alg := NewES256(pub, nil)
+	// Valid base64 but wrong length (ES256 expects 64 bytes)
+	sig := &Signature{Protected: "e30", Signature: "YQ"} // 1 byte
+	if alg.Verify(sig, []byte("x")) {
+		t.Error("Verify with wrong signature length should be false")
+	}
+}
+
+// Name() with unrecognized alg panics (default branch).
+func TestECDSA_Name_UnrecognizedPanics(t *testing.T) {
+	_, pub := mustECDSAP256(t)
+	e := &ECDSA{PublicKey: pub, alg: crypto.Hash(999)}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Name() with unrecognized alg should panic")
+		}
+	}()
+	e.Name()
+}
+
+// hash error path (simulated via test hook)
+func TestECDSA_hash_Error(t *testing.T) {
+	hashErrorForTestECDSA = errors.New("hash fail")
+	defer func() { hashErrorForTestECDSA = nil }()
+	priv, pub := mustECDSAP256(t)
+	alg := NewES256(pub, priv)
+	_, err := alg.Sign("JWT", []byte("x"))
+	if err == nil {
+		t.Fatal("Sign when hash fails should error")
+	}
+	_, pub2 := mustECDSAP256(t)
+	alg2 := NewES256(pub2, nil)
+	sig := &Signature{Protected: "e30", Signature: "YQ"} // valid base64, wrong length
+	if alg2.Verify(sig, []byte("x")) {
+		t.Error("Verify when hash fails should be false")
+	}
+}
+
+// Sign two payloads, swap signatures: verify A with B's signature must be false.
+func TestECDSA_Verify_SwappedSignature(t *testing.T) {
+	priv, pub := mustECDSAP256(t)
+	alg := NewES256(pub, priv)
+	sigA, _ := alg.Sign("JWT", []byte("payloadA"))
+	sigB, _ := alg.Sign("JWT", []byte("payloadB"))
+	// Verify A's payload with B's signature
+	if alg.Verify(&Signature{Protected: sigA.Protected, Signature: sigB.Signature}, []byte("payloadA")) {
+		t.Error("Verify with swapped signature should be false")
 	}
 }
 

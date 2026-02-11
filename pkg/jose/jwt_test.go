@@ -1,6 +1,7 @@
 package jose_test
 
 import (
+	"errors"
 	"testing"
 
 	"proto.zip/studio/jose/internal/base64url"
@@ -108,5 +109,33 @@ func TestJWT_Compact_NoAlg_NoneDisabled(t *testing.T) {
 	_, err := jwt.Compact()
 	if err == nil {
 		t.Fatal("Compact with nil alg and None disabled should error")
+	}
+}
+
+func TestJWT_JWS_MarshalError(t *testing.T) {
+	// Claims that cannot be JSON-marshaled (channel is not supported by encoding/json).
+	jwt := jose.NewJWT(nil)
+	jwt.Claims["bad"] = make(chan int)
+	_, err := jwt.JWS()
+	if err == nil {
+		t.Fatal("JWS with unmarshalable claims should error")
+	}
+}
+
+func TestJWT_Compact_JWSError(t *testing.T) {
+	jwt := jose.NewJWT(nil)
+	jwt.Claims["bad"] = make(chan int)
+	_, err := jwt.Compact()
+	if err == nil {
+		t.Fatal("Compact when JWS() fails should error")
+	}
+}
+
+func TestJWT_JWS_SignError(t *testing.T) {
+	jwt := jose.NewJWT(&mockAlgorithm{SignErr: errors.New("sign failed")})
+	jwt.Claims["sub"] = "test"
+	_, err := jwt.JWS()
+	if err == nil {
+		t.Fatal("JWS when Sign fails should error")
 	}
 }

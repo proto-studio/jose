@@ -2,6 +2,7 @@ package jose
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -56,5 +57,15 @@ func TestJWKS_AlgorithmsFor(t *testing.T) {
 	algs = jwks.AlgorithmsFor(head)
 	if len(algs) != 0 {
 		t.Errorf("AlgorithmsFor(nonexistent kid) len = %d, want 0", len(algs))
+	}
+}
+
+func TestJWKS_String_MarshalError(t *testing.T) {
+	old := jsonMarshalJWKS
+	jsonMarshalJWKS = func(interface{}) ([]byte, error) { return nil, errors.New("fail") }
+	defer func() { jsonMarshalJWKS = old }()
+	j := NewJWKS(&JWK{Kty: "RSA"})
+	if s := j.String(); s != "{}" {
+		t.Errorf("String() on marshal error = %q, want \"{}\"", s)
 	}
 }

@@ -1,8 +1,10 @@
 package jose
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"testing"
 )
 
@@ -61,6 +63,78 @@ func TestRSA_VerifyBadSignature(t *testing.T) {
 	sig := &Signature{Protected: "e30", Signature: "invalid"}
 	if alg.Verify(sig, []byte("x")) {
 		t.Error("Verify with bad signature should be false")
+	}
+}
+
+func TestRSA_VerifyInvalidBase64Signature(t *testing.T) {
+	_, pub := mustRSAKey(t, 2048)
+	alg := NewRS256(pub, nil)
+	sig := &Signature{Protected: "e30", Signature: "!!!"}
+	if alg.Verify(sig, []byte("x")) {
+		t.Error("Verify with invalid base64 signature should be false")
+	}
+}
+
+func TestRSA_Sign_NilPrivateKey(t *testing.T) {
+	_, pub := mustRSAKey(t, 2048)
+	alg := NewRS256(pub, nil)
+	_, err := alg.Sign("JWT", []byte("data"))
+	if err == nil {
+		t.Fatal("Sign with nil PrivateKey should error")
+	}
+}
+
+func TestRSA_Sign_WithKid(t *testing.T) {
+	priv, pub := mustRSAKey(t, 2048)
+	alg := NewRS256(pub, priv)
+	alg.Kid = "rsa-kid"
+	sig, err := alg.Sign("JWT", []byte("data"))
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if !alg.Verify(sig, []byte("data")) {
+		t.Error("Verify failed")
+	}
+}
+
+// Name() with unrecognized alg panics.
+func TestRSA_Name_UnrecognizedPanics(t *testing.T) {
+	_, pub := mustRSAKey(t, 2048)
+	alg := &RSA{PublicKey: pub, alg: crypto.Hash(999)}
+	defer func() {
+		if rec := recover(); rec == nil {
+			t.Error("Name() with unrecognized alg should panic")
+		}
+	}()
+	alg.Name()
+}
+
+// hash error path (simulated via test hook)
+func TestRSA_hash_Error(t *testing.T) {
+	hashErrorForTestRSA = errors.New("hash fail")
+	defer func() { hashErrorForTestRSA = nil }()
+	priv, pub := mustRSAKey(t, 2048)
+	alg := NewRS256(pub, priv)
+	_, err := alg.Sign("JWT", []byte("x"))
+	if err == nil {
+		t.Fatal("Sign when hash fails should error")
+	}
+	_, pub2 := mustRSAKey(t, 2048)
+	alg2 := NewRS256(pub2, nil)
+	sig := &Signature{Protected: "e30", Signature: "e30"}
+	if alg2.Verify(sig, []byte("x")) {
+		t.Error("Verify when hash fails should be false")
+	}
+}
+
+// Sign two payloads, swap signatures: verify A with B's signature must be false.
+func TestRSA_Verify_SwappedSignature(t *testing.T) {
+	priv, pub := mustRSAKey(t, 2048)
+	alg := NewRS256(pub, priv)
+	sigA, _ := alg.Sign("JWT", []byte("payloadA"))
+	sigB, _ := alg.Sign("JWT", []byte("payloadB"))
+	if alg.Verify(&Signature{Protected: sigA.Protected, Signature: sigB.Signature}, []byte("payloadA")) {
+		t.Error("Verify with swapped signature should be false")
 	}
 }
 
