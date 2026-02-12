@@ -11,6 +11,10 @@ coverage.out
 coverage.html
 COVERAGE_REPORT.md
 
+# Test-generated keys (do not commit)
+test.pem
+test.pub
+
 # IDE and OS
 .DS_Store
 .idea/
