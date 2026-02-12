@@ -37,7 +37,7 @@ func TestGetFullHeader(t *testing.T) {
 	}
 	if head == nil {
 		t.Errorf("Expected full header to not be nil")
-	} else if alg, _ := head[jose.HeaderAlg]; alg != "none" {
+	} else if alg := head[jose.HeaderAlg]; alg != "none" {
 		t.Errorf("Expected Algorithm to be `%s`, got: %s", "none", alg)
 	}
 
@@ -50,10 +50,10 @@ func TestGetFullHeader(t *testing.T) {
 	if head == nil {
 		t.Errorf("Expected full header to not be nil")
 	} else {
-		if alg, _ := head[jose.HeaderAlg]; alg != "HS256" {
+		if alg := head[jose.HeaderAlg]; alg != "HS256" {
 			t.Errorf("Expected Algorithm to be `%s`, got: %s", "HS256", alg)
 		}
-		if kid, _ := head[jose.HeaderKid]; kid != "abc" {
+		if kid := head[jose.HeaderKid]; kid != "abc" {
 			t.Errorf("Expected Kid to be `%s`, got: %s", "abc", kid)
 		}
 	}
@@ -67,7 +67,7 @@ func TestGetFullHeader(t *testing.T) {
 	if head == nil {
 		t.Errorf("Expected full header to not be nil")
 	} else {
-		if alg, _ := head[jose.HeaderAlg]; alg != "HS256" {
+		if alg := head[jose.HeaderAlg]; alg != "HS256" {
 			t.Errorf("Expected Algorithm to be `%s`, got: %s", "HS256", alg)
 		}
 		if kid, ok := head[jose.HeaderKid]; ok {

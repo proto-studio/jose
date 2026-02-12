@@ -10,7 +10,6 @@ import (
 
 var privateKey *rsa.PrivateKey
 var publicKey *rsa.PublicKey
-var verifyPublicKey *rsa.PublicKey
 
 func init() {
 	// Generate sample RSA private and public keys for testing

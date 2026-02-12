@@ -110,7 +110,7 @@ func (jws *JWS) Sign(alg ...Algorithm) error {
 // If an empty string is passed in then the resulting header will have no "typ" value.
 func (jws *JWS) SignWithType(typ string, alg ...Algorithm) error {
 	if len(alg) == 0 {
-		return errors.New("No algorithms to sign with.")
+		return errors.New("no algorithms to sign with")
 	}
 
 	if jws.Signatures == nil {
@@ -183,11 +183,11 @@ func (jws *JWS) Compact() (string, error) {
 	}
 
 	if jws.Signature == "" && !None() {
-		return "", errors.New("Signature is required. All AllowNone() to disable this error.")
+		return "", errors.New("signature is required; call EnableNone() to allow unsigned JWS")
 	}
 
 	if jws.Header != nil {
-		return "", errors.New("Unprotected headers are not supported by the compact representation.")
+		return "", errors.New("unprotected headers are not supported by the compact representation")
 	}
 
 	if jws.Signature == "" {
@@ -211,7 +211,7 @@ func (jws *JWS) Flatten() error {
 	l := len(jws.Signatures)
 
 	if l > 1 {
-		return errors.New("Cannot flatten because there is more than one signature.")
+		return errors.New("cannot flatten because there is more than one signature")
 	}
 	if l == 1 {
 		jws.Signature = jws.Signatures[0].Signature

@@ -263,10 +263,10 @@ func (j *JWK) algorithmRSA(alg string) (Algorithm, error) {
 		return NewRS512(pub, priv), nil
 	}
 
-	return nil, fmt.Errorf("Unknown RSA algorithm: %s", alg)
+	return nil, fmt.Errorf("unknown RSA algorithm: %s", alg)
 }
 
-// algorithmRSA returns the ECDSA algorithm for the JWK
+// algorithmEC returns the ECDSA algorithm for the JWK
 func (j *JWK) algorithmEC(alg string) (Algorithm, error) {
 	pub, priv, err := j.getECDSAKeys()
 	if err != nil {
@@ -276,23 +276,22 @@ func (j *JWK) algorithmEC(alg string) (Algorithm, error) {
 	switch alg {
 	case "ES256":
 		if j.Crv != "P-256" {
-			return nil, fmt.Errorf("Incompatible curve, expected P-256, got %s", j.Crv)
+			return nil, fmt.Errorf("incompatible curve, expected P-256, got %s", j.Crv)
 		}
 		return NewES256(pub, priv), nil
 	case "ES384":
 		if j.Crv != "P-384" {
-			return nil, fmt.Errorf("Incompatible curve, expected P-384, got %s", j.Crv)
+			return nil, fmt.Errorf("incompatible curve, expected P-384, got %s", j.Crv)
 		}
 		return NewES384(pub, priv), nil
 	case "ES512":
 		if j.Crv != "P-521" {
-			return nil, fmt.Errorf("Incompatible curve, expected P-521, got %s", j.Crv)
+			return nil, fmt.Errorf("incompatible curve, expected P-521, got %s", j.Crv)
 		}
 		return NewES512(pub, priv), nil
 	}
 
-	return nil, fmt.Errorf("Unknown RSA algorithm: %s", alg)
-
+	return nil, fmt.Errorf("unknown EC algorithm: %s", alg)
 }
 
 // Algorithm returns an algorithm for the specific key if the key is compatible.
@@ -306,5 +305,5 @@ func (j *JWK) Algorithm(alg string) (Algorithm, error) {
 	case "ES256", "ES384", "ES512":
 		return j.algorithmEC(alg)
 	}
-	return nil, fmt.Errorf("Unsupported algorithm")
+	return nil, fmt.Errorf("unsupported algorithm")
 }
