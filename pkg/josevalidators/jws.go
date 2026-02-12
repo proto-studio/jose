@@ -12,6 +12,7 @@ import (
 	"proto.zip/studio/validate/pkg/rules"
 )
 
+// JWSRuleSet validates a JSON Web Signature (compact or expanded form), including optional signature verification.
 type JWSRuleSet struct {
 	rules.NoConflict[*jose.JWS]
 	required bool

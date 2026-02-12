@@ -29,6 +29,7 @@ func (otherJWSRule) String() string {
 	return "other"
 }
 
+// TestVerifyRule_Replaces tests that verifyRule.Replaces returns true for another verifyRule.
 func TestVerifyRule_Replaces(t *testing.T) {
 	r := &verifyRule{fn: func(context.Context, jose.Header) *jose.JWK { return nil }}
 	if !r.Replaces(r) {
@@ -40,6 +41,7 @@ func TestVerifyRule_Replaces(t *testing.T) {
 	}
 }
 
+// TestVerifyRule_String tests that verifyRule.String returns a fixed label.
 func TestVerifyRule_String(t *testing.T) {
 	// Rule's String() is used when added via WithRule; built-ins use RuleSet label (WithJWK(), etc.)
 	r := &verifyRule{fn: nil}
@@ -48,6 +50,7 @@ func TestVerifyRule_String(t *testing.T) {
 	}
 }
 
+// TestJWS_WithJWKSURL_CacheShared tests that the JWKS URL cache is shared across validators.
 func TestJWS_WithJWKSURL_CacheShared(t *testing.T) {
 	clearJWKSCacheForTest()
 	defer clearJWKSCacheForTest()
@@ -86,6 +89,7 @@ func TestJWS_WithJWKSURL_CacheShared(t *testing.T) {
 	}
 }
 
+// TestJWS_WithJWKSURL_304NotModified tests that a 304 response reuses the cached JWKS.
 func TestJWS_WithJWKSURL_304NotModified(t *testing.T) {
 	clearJWKSCacheForTest()
 	defer clearJWKSCacheForTest()
@@ -137,6 +141,7 @@ func TestJWS_WithJWKSURL_304NotModified(t *testing.T) {
 	}
 }
 
+// TestJWS_WithJWKSURL_MinTTL tests that the JWKS cache enforces a minimum TTL before revalidation.
 func TestJWS_WithJWKSURL_MinTTL(t *testing.T) {
 	clearJWKSCacheForTest()
 	defer clearJWKSCacheForTest()

@@ -17,17 +17,23 @@ func mustECDSAP256(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	return key, &key.PublicKey
 }
 
+// TestNewES256 tests that NewES256 returns a non-nil algorithm with Name ES256.
 func TestNewES256(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
 	if alg == nil {
 		t.Fatal("NewES256 returned nil")
 	}
-	if alg.Name() != "ES256" {
-		t.Errorf("Name() = %s, want ES256", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "ES256" {
+		t.Errorf("Name() = %s, want ES256", name)
 	}
 }
 
+// TestNewES384 tests that NewES384 returns a non-nil algorithm with Name ES384.
 func TestNewES384(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
@@ -37,11 +43,16 @@ func TestNewES384(t *testing.T) {
 	if alg == nil {
 		t.Fatal("NewES384 returned nil")
 	}
-	if alg.Name() != "ES384" {
-		t.Errorf("Name() = %s, want ES384", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "ES384" {
+		t.Errorf("Name() = %s, want ES384", name)
 	}
 }
 
+// TestNewES512 tests that NewES512 returns a non-nil algorithm with Name ES512.
 func TestNewES512(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
@@ -51,11 +62,16 @@ func TestNewES512(t *testing.T) {
 	if alg == nil {
 		t.Fatal("NewES512 returned nil")
 	}
-	if alg.Name() != "ES512" {
-		t.Errorf("Name() = %s, want ES512", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "ES512" {
+		t.Errorf("Name() = %s, want ES512", name)
 	}
 }
 
+// TestECDSA_Sign_NilPrivateKey tests that Sign returns an error when the private key is nil.
 func TestECDSA_Sign_NilPrivateKey(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
@@ -65,6 +81,7 @@ func TestECDSA_Sign_NilPrivateKey(t *testing.T) {
 	}
 }
 
+// TestECDSA_Sign_WithKid tests that Sign includes kid in the header when set.
 func TestECDSA_Sign_WithKid(t *testing.T) {
 	priv, pub := mustECDSAP256(t)
 	alg := NewES256(pub, priv)
@@ -82,6 +99,7 @@ func TestECDSA_Sign_WithKid(t *testing.T) {
 	}
 }
 
+// TestECDSA_SignVerify tests that Sign produces a verifiable signature and Verify rejects wrong payload.
 func TestECDSA_SignVerify(t *testing.T) {
 	priv, pub := mustECDSAP256(t)
 	alg := NewES256(pub, priv)
@@ -101,6 +119,7 @@ func TestECDSA_SignVerify(t *testing.T) {
 	}
 }
 
+// TestECDSA_Verify_InvalidBase64Sig tests that Verify returns false for invalid base64 in the signature.
 func TestECDSA_Verify_InvalidBase64Sig(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
@@ -110,6 +129,7 @@ func TestECDSA_Verify_InvalidBase64Sig(t *testing.T) {
 	}
 }
 
+// TestECDSA_VerifyBadSignature tests that Verify returns false for an invalid signature.
 func TestECDSA_VerifyBadSignature(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
@@ -119,6 +139,7 @@ func TestECDSA_VerifyBadSignature(t *testing.T) {
 	}
 }
 
+// TestECDSA_VerifyWrongSignatureLength tests that Verify returns false when the signature has the wrong length.
 func TestECDSA_VerifyWrongSignatureLength(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
@@ -129,19 +150,20 @@ func TestECDSA_VerifyWrongSignatureLength(t *testing.T) {
 	}
 }
 
-// Name() with unrecognized alg panics (default branch).
-func TestECDSA_Name_UnrecognizedPanics(t *testing.T) {
+// TestECDSA_Name_UnrecognizedReturnsError verifies that Name returns an error for an unrecognized algorithm.
+func TestECDSA_Name_UnrecognizedReturnsError(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	e := &ECDSA{PublicKey: pub, alg: crypto.Hash(999)}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Name() with unrecognized alg should panic")
-		}
-	}()
-	e.Name()
+	name, err := e.Name()
+	if err == nil {
+		t.Error("Name() with unrecognized alg should return error")
+	}
+	if name != "" {
+		t.Errorf("Name() on unrecognized alg = %q, want empty string", name)
+	}
 }
 
-// hash error path (simulated via test hook)
+// TestECDSA_hash_Error tests Sign and Verify when the hash step fails (simulated via test hook).
 func TestECDSA_hash_Error(t *testing.T) {
 	hashErrorForTestECDSA = errors.New("hash fail")
 	defer func() { hashErrorForTestECDSA = nil }()
@@ -159,7 +181,7 @@ func TestECDSA_hash_Error(t *testing.T) {
 	}
 }
 
-// Sign two payloads, swap signatures: verify A with B's signature must be false.
+// TestECDSA_Verify_SwappedSignature tests that Verify returns false when the signature is from a different payload.
 func TestECDSA_Verify_SwappedSignature(t *testing.T) {
 	priv, pub := mustECDSAP256(t)
 	alg := NewES256(pub, priv)
@@ -171,28 +193,44 @@ func TestECDSA_Verify_SwappedSignature(t *testing.T) {
 	}
 }
 
+// TestECDSA_AlgorithmsFor tests that AlgorithmsFor returns the algorithm only when alg and kid match.
 func TestECDSA_AlgorithmsFor(t *testing.T) {
 	_, pub := mustECDSAP256(t)
 	alg := NewES256(pub, nil)
 	alg.Kid = "mykid"
 
-	got := alg.AlgorithmsFor(Header{"alg": "ES256"})
+	got, err := alg.AlgorithmsFor(Header{"alg": "ES256"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 1 {
 		t.Errorf("AlgorithmsFor(alg=ES256) len = %d, want 1", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "RS256"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "RS256"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("AlgorithmsFor(alg=RS256) len = %d, want 0", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "ES256", "kid": "mykid"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "ES256", "kid": "mykid"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 1 {
 		t.Errorf("AlgorithmsFor(kid=mykid) len = %d, want 1", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "ES256", "kid": "other"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "ES256", "kid": "other"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("AlgorithmsFor(kid=other) len = %d, want 0", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{})
+	got, err = alg.AlgorithmsFor(Header{})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 1 {
 		t.Errorf("AlgorithmsFor(no header) len = %d, want 1", len(got))
 	}

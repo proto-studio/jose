@@ -52,18 +52,22 @@ func (alg *mockAlgorithm) Sign(_ string, payload []byte) (*jose.Signature, error
 	}, nil
 }
 
-func (alg *mockAlgorithm) Name() string {
-	return "MOCK"
+func (alg *mockAlgorithm) Name() (string, error) {
+	return "MOCK", nil
 }
 
+// TestAlgorithmsStoreFunc tests that AlgorithmsStoreFunc calls the wrapped function and returns its result.
 func TestAlgorithmsStoreFunc(t *testing.T) {
 	var called bool
-	fn := jose.AlgorithmsStoreFunc(func(head *jose.Header) []jose.Algorithm {
+	fn := jose.AlgorithmsStoreFunc(func(head *jose.Header) ([]jose.Algorithm, error) {
 		called = true
-		return nil
+		return nil, nil
 	})
 	h := jose.Header{"alg": "ES256"}
-	out := fn.AlgorithmsFor(&h)
+	out, err := fn.AlgorithmsFor(&h)
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if !called {
 		t.Error("AlgorithmsFor did not call the func")
 	}

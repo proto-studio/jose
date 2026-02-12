@@ -36,6 +36,7 @@ func NewJWT(alg Algorithm) *JWT {
 	}
 }
 
+// JWTFromJWS flattens the JWS, decodes the payload as JSON claims, and returns a JWT. The JWT does not retain the algorithm or signature.
 func JWTFromJWS(jws *JWS) (*JWT, error) {
 	err := jws.Flatten()
 	if err != nil {

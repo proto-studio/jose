@@ -10,6 +10,7 @@ import (
 	"testing"
 )
 
+// TestNewJWK_FromString tests creating a JWK from a JSON string.
 func TestNewJWK_FromString(t *testing.T) {
 	jwk, err := NewJWK(`{"kty":"RSA","n":"x","e":"AQAB"}`)
 	if err != nil {
@@ -20,6 +21,7 @@ func TestNewJWK_FromString(t *testing.T) {
 	}
 }
 
+// TestNewJWK_FromStringInvalidJSON tests that NewJWK returns an error for invalid JSON.
 func TestNewJWK_FromStringInvalidJSON(t *testing.T) {
 	_, err := NewJWK(`{invalid}`)
 	if err == nil {
@@ -27,6 +29,7 @@ func TestNewJWK_FromStringInvalidJSON(t *testing.T) {
 	}
 }
 
+// TestNewJWK_FromECDSAPublicKey tests creating a JWK from an ECDSA public key.
 func TestNewJWK_FromECDSAPublicKey(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -48,6 +51,7 @@ func TestNewJWK_FromECDSAPublicKey(t *testing.T) {
 	}
 }
 
+// TestNewJWK_FromECDSAPrivateKey tests creating a JWK from an ECDSA private key.
 func TestNewJWK_FromECDSAPrivateKey(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -62,6 +66,7 @@ func TestNewJWK_FromECDSAPrivateKey(t *testing.T) {
 	}
 }
 
+// TestNewJWK_FromRSAPublicKey tests creating a JWK from an RSA public key.
 func TestNewJWK_FromRSAPublicKey(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -83,6 +88,7 @@ func TestNewJWK_FromRSAPublicKey(t *testing.T) {
 	}
 }
 
+// TestNewJWK_FromRSAPrivateKey tests creating a JWK from an RSA private key.
 func TestNewJWK_FromRSAPrivateKey(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -104,6 +110,7 @@ func TestNewJWK_FromRSAPrivateKey(t *testing.T) {
 	}
 }
 
+// TestNewJWK_FromJWKClone tests creating a JWK by cloning another JWK.
 func TestNewJWK_FromJWKClone(t *testing.T) {
 	orig := &JWK{Kty: "RSA", N: "n", E: "e", Kid: "x"}
 	jwk, err := NewJWK(orig)
@@ -125,6 +132,7 @@ func TestNewJWK_FromJWKClone(t *testing.T) {
 	}
 }
 
+// TestNewJWK_UnsupportedType tests that NewJWK returns an error for an unsupported type.
 func TestNewJWK_UnsupportedType(t *testing.T) {
 	_, err := NewJWK(42)
 	if err == nil {
@@ -132,6 +140,7 @@ func TestNewJWK_UnsupportedType(t *testing.T) {
 	}
 }
 
+// TestJWK_String tests that String returns valid JSON for the JWK.
 func TestJWK_String(t *testing.T) {
 	jwk := &JWK{Kty: "RSA", N: "n", E: "e"}
 	s := jwk.String()
@@ -144,6 +153,7 @@ func TestJWK_String(t *testing.T) {
 	}
 }
 
+// TestJWK_String_MarshalError tests that String returns "{}" when JSON marshal fails.
 func TestJWK_String_MarshalError(t *testing.T) {
 	old := jsonMarshalJWK
 	jsonMarshalJWK = func(interface{}) ([]byte, error) { return nil, errors.New("fail") }
@@ -154,6 +164,7 @@ func TestJWK_String_MarshalError(t *testing.T) {
 	}
 }
 
+// TestJWK_Clone tests that Clone returns a shallow copy of the JWK.
 func TestJWK_Clone(t *testing.T) {
 	orig := &JWK{Kty: "EC", Crv: "P-256", X: "x", Y: "y", N: "n", E: "e"}
 	c := orig.Clone()
@@ -165,6 +176,7 @@ func TestJWK_Clone(t *testing.T) {
 	}
 }
 
+// TestJWK_Algorithm_RSA tests Algorithm for RS256, RS384, RS512 with an RSA JWK.
 func TestJWK_Algorithm_RSA(t *testing.T) {
 	// Use known-good RSA JWK (public only)
 	jwk, err := NewJWK(`{"kty":"RSA","kid":"RSA20240212","n":"y4hxdh_gsACZsZpUg-l4hpdf5Qo4lUyJV1SbJRsJuqRLKTZHYhrTJ1uUDfIYNcNeemxL73zytN6SfJvBgDYThqN2OTrX_G1LMadI_CtKrV-kUZXjyY41KAcgHvPuVhhWX3ksYaKqVijT7ViOS3DG3t7AKVsD_BBIzxQ_ZaQLKG5YmG64xL6WGNdpTrBeT87-ZJ9-ojhhP2eytkjLhB6aO5kzIiXRsN_b0A0ubm2ujKkBP4tnsGGcbJzwlappWJb3qdOYXL77kcFIuxIRsfKCrb5Tuds862jpawKYZdFC_46tJ_CRieHMo-o-6XGmfp_VXvAv2FkRDbqDtnU8_mKvuQ","e":"AQAB"}`)
@@ -175,7 +187,11 @@ func TestJWK_Algorithm_RSA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Algorithm(RS256): %v", err)
 	}
-	if alg == nil || alg.Name() != "RS256" {
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Algorithm(RS256).Name(): %v", err)
+	}
+	if alg == nil || name != "RS256" {
 		t.Errorf("Algorithm(RS256) = %v", alg)
 	}
 	alg, err = jwk.Algorithm("RS384")
@@ -202,6 +218,7 @@ func TestJWK_Algorithm_RSA(t *testing.T) {
 	}
 }
 
+// TestJWK_Algorithm_EC tests Algorithm for ES256 with a P-256 EC JWK.
 func TestJWK_Algorithm_EC(t *testing.T) {
 	const ecJWK = `{"kty":"EC","crv":"P-256","kid":"EC20240131","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`
 	jwk, err := NewJWK(ecJWK)
@@ -212,7 +229,11 @@ func TestJWK_Algorithm_EC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Algorithm(ES256): %v", err)
 	}
-	if alg == nil || alg.Name() != "ES256" {
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Algorithm(ES256).Name(): %v", err)
+	}
+	if alg == nil || name != "ES256" {
 		t.Errorf("Algorithm(ES256) = %v", alg)
 	}
 	_, err = jwk.Algorithm("ES384")
@@ -225,6 +246,7 @@ func TestJWK_Algorithm_EC(t *testing.T) {
 	}
 }
 
+// TestJWK_getRSAKeys_NotRSA tests that getRSAKeys returns an error for a non-RSA JWK.
 func TestJWK_getRSAKeys_NotRSA(t *testing.T) {
 	jwk := &JWK{Kty: "EC", Crv: "P-256"}
 	_, _, err := jwk.getRSAKeys()
@@ -233,6 +255,7 @@ func TestJWK_getRSAKeys_NotRSA(t *testing.T) {
 	}
 }
 
+// TestJWK_Algorithm_RSA_GetRSAKeysFails tests that Algorithm returns an error when getRSAKeys fails.
 func TestJWK_Algorithm_RSA_GetRSAKeysFails(t *testing.T) {
 	jwk := &JWK{Kty: "RSA", N: "!!!", E: "AQAB"}
 	_, err := jwk.Algorithm("RS256")
@@ -241,6 +264,7 @@ func TestJWK_Algorithm_RSA_GetRSAKeysFails(t *testing.T) {
 	}
 }
 
+// TestJWK_Algorithm_EC_GetECDSAKeysFails tests that Algorithm returns an error when getECDSAKeys fails.
 func TestJWK_Algorithm_EC_GetECDSAKeysFails(t *testing.T) {
 	jwk := &JWK{Kty: "EC", Crv: "P-256", X: "!!!", Y: "y"}
 	_, err := jwk.Algorithm("ES256")
@@ -249,6 +273,7 @@ func TestJWK_Algorithm_EC_GetECDSAKeysFails(t *testing.T) {
 	}
 }
 
+// TestJWK_getECDSAKeys_NotEC tests that getECDSAKeys returns an error for a non-EC JWK.
 func TestJWK_getECDSAKeys_NotEC(t *testing.T) {
 	jwk := &JWK{Kty: "RSA", N: "n", E: "e"}
 	_, _, err := jwk.getECDSAKeys()
@@ -257,6 +282,7 @@ func TestJWK_getECDSAKeys_NotEC(t *testing.T) {
 	}
 }
 
+// TestJWK_getECDSAKeys_UnsupportedCurve tests that getECDSAKeys returns an error for an unsupported curve.
 func TestJWK_getECDSAKeys_UnsupportedCurve(t *testing.T) {
 	jwk := &JWK{Kty: "EC", Crv: "P-999", X: "x", Y: "y"}
 	_, _, err := jwk.getECDSAKeys()
@@ -265,7 +291,7 @@ func TestJWK_getECDSAKeys_UnsupportedCurve(t *testing.T) {
 	}
 }
 
-// Test getJWKCrv and getCurve for P-384 and P-521 via NewJWK and Algorithm.
+// TestJWK_EC_P384_P521 tests getJWKCrv and getCurve for P-384 and P-521 via NewJWK and Algorithm.
 func TestJWK_EC_P384_P521(t *testing.T) {
 	key384, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
@@ -282,8 +308,12 @@ func TestJWK_EC_P384_P521(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Algorithm ES384: %v", err)
 	}
-	if alg.Name() != "ES384" {
-		t.Errorf("alg.Name() = %s", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Algorithm ES384 Name(): %v", err)
+	}
+	if name != "ES384" {
+		t.Errorf("alg.Name() = %s", name)
 	}
 
 	key521, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
@@ -301,11 +331,16 @@ func TestJWK_EC_P384_P521(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Algorithm ES512: %v", err)
 	}
-	if alg.Name() != "ES512" {
-		t.Errorf("alg.Name() = %s", alg.Name())
+	name, err = alg.Name()
+	if err != nil {
+		t.Fatalf("Algorithm ES512 Name(): %v", err)
+	}
+	if name != "ES512" {
+		t.Errorf("alg.Name() = %s", name)
 	}
 }
 
+// TestJWK_algorithmEC_CurveMismatch tests that ES384 with a P-256 JWK returns an error.
 func TestJWK_algorithmEC_CurveMismatch(t *testing.T) {
 	// P-256 JWK with ES384 should error
 	jwk, _ := NewJWK(`{"kty":"EC","crv":"P-256","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`)
@@ -315,7 +350,7 @@ func TestJWK_algorithmEC_CurveMismatch(t *testing.T) {
 	}
 }
 
-// ES256 expects P-256; P-384 JWK should error.
+// TestJWK_algorithmEC_ES256_WrongCurve tests that ES256 with a P-384 JWK returns an error.
 func TestJWK_algorithmEC_ES256_WrongCurve(t *testing.T) {
 	jwk384, _ := NewJWK(`{"kty":"EC","crv":"P-384","x":"x","y":"y"}`)
 	_, err := jwk384.Algorithm("ES256")
@@ -324,7 +359,7 @@ func TestJWK_algorithmEC_ES256_WrongCurve(t *testing.T) {
 	}
 }
 
-// ES512 expects P-521; P-256 JWK should error.
+// TestJWK_algorithmEC_ES512_WrongCurve tests that ES512 with a P-256 JWK returns an error.
 func TestJWK_algorithmEC_ES512_WrongCurve(t *testing.T) {
 	jwk256, _ := NewJWK(`{"kty":"EC","crv":"P-256","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`)
 	_, err := jwk256.Algorithm("ES512")
@@ -333,6 +368,7 @@ func TestJWK_algorithmEC_ES512_WrongCurve(t *testing.T) {
 	}
 }
 
+// TestJWK_Algorithm_Unsupported tests that Algorithm returns an error for unsupported alg (e.g. HS256 with RSA JWK).
 func TestJWK_Algorithm_Unsupported(t *testing.T) {
 	jwk, _ := NewJWK(`{"kty":"RSA","n":"n","e":"AQAB"}`)
 	_, err := jwk.Algorithm("HS256")
@@ -341,6 +377,7 @@ func TestJWK_Algorithm_Unsupported(t *testing.T) {
 	}
 }
 
+// TestJWK_algorithmEC_UnknownAlg tests that algorithmEC returns an error for an unknown EC alg.
 func TestJWK_algorithmEC_UnknownAlg(t *testing.T) {
 	jwk, _ := NewJWK(`{"kty":"EC","crv":"P-256","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`)
 	_, err := jwk.Algorithm("ES999")
@@ -349,6 +386,7 @@ func TestJWK_algorithmEC_UnknownAlg(t *testing.T) {
 	}
 }
 
+// TestJWK_algorithmRSA_UnknownAlg tests that algorithmRSA returns an error for an unknown RSA alg.
 func TestJWK_algorithmRSA_UnknownAlg(t *testing.T) {
 	jwk, _ := NewJWK(`{"kty":"RSA","n":"YQ","e":"AQAB"}`)
 	_, err := jwk.Algorithm("RS999")
@@ -357,6 +395,7 @@ func TestJWK_algorithmRSA_UnknownAlg(t *testing.T) {
 	}
 }
 
+// TestJWK_getRSAKeys_InvalidN tests that getRSAKeys returns an error when N is invalid base64.
 func TestJWK_getRSAKeys_InvalidN(t *testing.T) {
 	jwk := &JWK{Kty: "RSA", N: "!!!", E: "AQAB"}
 	_, _, err := jwk.getRSAKeys()
@@ -365,6 +404,7 @@ func TestJWK_getRSAKeys_InvalidN(t *testing.T) {
 	}
 }
 
+// TestJWK_getRSAKeys_InvalidE tests that getRSAKeys returns an error when E is invalid base64.
 func TestJWK_getRSAKeys_InvalidE(t *testing.T) {
 	jwk := &JWK{Kty: "RSA", N: "YQ", E: "!!!"}
 	_, _, err := jwk.getRSAKeys()
@@ -373,6 +413,7 @@ func TestJWK_getRSAKeys_InvalidE(t *testing.T) {
 	}
 }
 
+// TestJWK_getRSAKeys_InvalidD tests that getRSAKeys returns an error when D is invalid base64.
 func TestJWK_getRSAKeys_InvalidD(t *testing.T) {
 	jwk := &JWK{Kty: "RSA", N: "YQ", E: "AQAB", D: "!!!"}
 	_, _, err := jwk.getRSAKeys()
@@ -381,6 +422,7 @@ func TestJWK_getRSAKeys_InvalidD(t *testing.T) {
 	}
 }
 
+// TestJWK_getECDSAKeys_InvalidX tests that getECDSAKeys returns an error when X is invalid base64.
 func TestJWK_getECDSAKeys_InvalidX(t *testing.T) {
 	// Valid Y from known P-256 JWK; invalid X
 	jwk := &JWK{Kty: "EC", Crv: "P-256", X: "!!!", Y: "d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}
@@ -390,6 +432,7 @@ func TestJWK_getECDSAKeys_InvalidX(t *testing.T) {
 	}
 }
 
+// TestJWK_getECDSAKeys_InvalidY tests that getECDSAKeys returns an error when Y is invalid base64.
 func TestJWK_getECDSAKeys_InvalidY(t *testing.T) {
 	jwk := &JWK{Kty: "EC", Crv: "P-256", X: "V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE", Y: "!!!"}
 	_, _, err := jwk.getECDSAKeys()
@@ -398,6 +441,7 @@ func TestJWK_getECDSAKeys_InvalidY(t *testing.T) {
 	}
 }
 
+// TestJWK_getECDSAKeys_InvalidD tests that getECDSAKeys returns an error when D is invalid base64.
 func TestJWK_getECDSAKeys_InvalidD(t *testing.T) {
 	jwk := &JWK{Kty: "EC", Crv: "P-256", X: "V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE", Y: "d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys", D: "!!!"}
 	_, _, err := jwk.getECDSAKeys()

@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 )
 
+// JWKS is a JSON Web Key Set: a set of JWKs used to verify JWS signatures.
 type JWKS struct {
 	Keys []*JWK `json:"keys" validate:"keys"`
 }
 
-// New creates a new JWKS from a slice of JWK pointers.
+// NewJWKS creates a new JWKS from a slice of JWK pointers.
 func NewJWKS(jwks ...*JWK) *JWKS {
 	return &JWKS{
 		Keys: jwks,
@@ -44,20 +45,22 @@ func (j *JWKS) String() string {
 }
 
 // AlgorithmsFor gets all algorithms that may be able to verify a specific header.
-func (j *JWKS) AlgorithmsFor(head Header) []Algorithm {
+func (j *JWKS) AlgorithmsFor(head *Header) ([]Algorithm, error) {
 	algs := make([]Algorithm, 0)
 
-	alg, _ := head["alg"].(string)
-	kid, _ := head["kid"].(string)
+	if head != nil {
+		alg, _ := (*head)["alg"].(string)
+		kid, _ := (*head)["kid"].(string)
 
-	for _, key := range j.Keys {
-		if key.Kid == kid {
-			alg, err := key.Algorithm(alg)
-			if alg != nil && err == nil {
-				algs = append(algs, alg)
+		for _, key := range j.Keys {
+			if key.Kid == kid {
+				alg, err := key.Algorithm(alg)
+				if alg != nil && err == nil {
+					algs = append(algs, alg)
+				}
 			}
 		}
 	}
 
-	return algs
+	return algs, nil
 }

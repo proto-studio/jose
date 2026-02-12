@@ -8,6 +8,7 @@ import (
 	"proto.zip/studio/jose/pkg/jose"
 )
 
+// TestNewJWT tests that NewJWT creates a JWT with the given algorithm and empty claims.
 func TestNewJWT(t *testing.T) {
 	jwt := jose.NewJWT(&mockAlgorithm{})
 	if jwt == nil {
@@ -18,6 +19,7 @@ func TestNewJWT(t *testing.T) {
 	}
 }
 
+// TestJWTCompact tests that Compact produces a three-part string when signed.
 func TestJWTCompact(t *testing.T) {
 	jwt := jose.NewJWT(&mockAlgorithm{})
 	compact, err := jwt.Compact()
@@ -29,6 +31,7 @@ func TestJWTCompact(t *testing.T) {
 	}
 }
 
+// TestJWTJWS tests that JWS returns a signed JWS with typ JWT.
 func TestJWTJWS(t *testing.T) {
 	jwt := jose.NewJWT(&mockAlgorithm{})
 	jws, err := jwt.JWS()
@@ -43,6 +46,7 @@ func TestJWTJWS(t *testing.T) {
 	}
 }
 
+// TestJWTHS256 tests signing a JWT with HS256 and compacting it.
 func TestJWTHS256(t *testing.T) {
 	alg := jose.NewH256([]byte("my-secret"))
 
@@ -61,6 +65,7 @@ func TestJWTHS256(t *testing.T) {
 	}
 }
 
+// TestJWTFromJWS_FlattenError tests that JWTFromJWS returns an error when Flatten fails.
 func TestJWTFromJWS_FlattenError(t *testing.T) {
 	// Multiple signatures so Flatten() fails
 	jws := &jose.JWS{Payload: "e30", Signatures: []jose.Signature{{}, {}}}
@@ -70,6 +75,7 @@ func TestJWTFromJWS_FlattenError(t *testing.T) {
 	}
 }
 
+// TestJWTFromJWS_InvalidPayload tests that JWTFromJWS returns an error for invalid base64 payload.
 func TestJWTFromJWS_InvalidPayload(t *testing.T) {
 	jws := &jose.JWS{Protected: "e30", Payload: "!!!", Signature: "e30"}
 	_, err := jose.JWTFromJWS(jws)
@@ -78,6 +84,7 @@ func TestJWTFromJWS_InvalidPayload(t *testing.T) {
 	}
 }
 
+// TestJWTFromJWS_InvalidJSONClaims tests that JWTFromJWS returns an error for invalid JSON in the payload.
 func TestJWTFromJWS_InvalidJSONClaims(t *testing.T) {
 	// Payload is base64url of non-JSON
 	payloadB64 := base64url.Encode([]byte("not json"))
@@ -88,6 +95,7 @@ func TestJWTFromJWS_InvalidJSONClaims(t *testing.T) {
 	}
 }
 
+// TestJWT_JWS_NoAlg tests that JWS succeeds with no signature when Alg is nil.
 func TestJWT_JWS_NoAlg(t *testing.T) {
 	jwt := jose.NewJWT(nil)
 	jwt.Claims["sub"] = "test"
@@ -103,6 +111,7 @@ func TestJWT_JWS_NoAlg(t *testing.T) {
 	}
 }
 
+// TestJWT_Compact_NoAlg_NoneDisabled tests that Compact returns an error when Alg is nil and none is disabled.
 func TestJWT_Compact_NoAlg_NoneDisabled(t *testing.T) {
 	jwt := jose.NewJWT(nil)
 	jwt.Claims["x"] = "y"
@@ -112,6 +121,7 @@ func TestJWT_Compact_NoAlg_NoneDisabled(t *testing.T) {
 	}
 }
 
+// TestJWT_JWS_MarshalError tests that JWS returns an error when claims cannot be marshaled.
 func TestJWT_JWS_MarshalError(t *testing.T) {
 	// Claims that cannot be JSON-marshaled (channel is not supported by encoding/json).
 	jwt := jose.NewJWT(nil)
@@ -122,6 +132,7 @@ func TestJWT_JWS_MarshalError(t *testing.T) {
 	}
 }
 
+// TestJWT_Compact_JWSError tests that Compact propagates an error from JWS().
 func TestJWT_Compact_JWSError(t *testing.T) {
 	jwt := jose.NewJWT(nil)
 	jwt.Claims["bad"] = make(chan int)
@@ -131,6 +142,7 @@ func TestJWT_Compact_JWSError(t *testing.T) {
 	}
 }
 
+// TestJWT_JWS_SignError tests that JWS propagates an error when Sign fails.
 func TestJWT_JWS_SignError(t *testing.T) {
 	jwt := jose.NewJWT(&mockAlgorithm{SignErr: errors.New("sign failed")})
 	jwt.Claims["sub"] = "test"

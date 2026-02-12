@@ -28,6 +28,7 @@ type JWK struct {
 	K   string `json:"k,omitempty" validate:"k"`     // K is the secret for symmetric keys.
 }
 
+// NewJWK creates a JWK from a JSON string, an *ecdsa or *rsa key, or a copy of another JWK.
 func NewJWK(data interface{}) (*JWK, error) {
 	switch v := data.(type) {
 	case string:
@@ -131,6 +132,7 @@ func newJWKFromRSAPublicKey(pubKey interface{}) (*JWK, error) {
 // jsonMarshalJWK is a hook for tests to simulate Marshal failure.
 var jsonMarshalJWK = json.Marshal
 
+// String returns the JSON representation of the JWK.
 func (j *JWK) String() string {
 	data, err := jsonMarshalJWK(j)
 	if err != nil {
@@ -139,6 +141,7 @@ func (j *JWK) String() string {
 	return string(data)
 }
 
+// Clone returns a shallow copy of the JWK.
 func (original *JWK) Clone() *JWK {
 	return &JWK{
 		Kty: original.Kty,
@@ -295,7 +298,7 @@ func (j *JWK) algorithmEC(alg string) (Algorithm, error) {
 // Algorithm returns an algorithm for the specific key if the key is compatible.
 // It does not enforce any hints (such as the Alg value).
 //
-// Depending on jow the JWK is created, the resulting algorithm may be able to verify but not sign.
+// Depending on how the JWK is created, the resulting algorithm may be able to verify but not sign.
 func (j *JWK) Algorithm(alg string) (Algorithm, error) {
 	switch alg {
 	case "RS256", "RS384", "RS512":

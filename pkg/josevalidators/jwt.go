@@ -11,6 +11,7 @@ import (
 	"proto.zip/studio/validate/pkg/rules"
 )
 
+// JWTRuleSet validates a JSON Web Token (claims, exp/nbf, and optional signature verification via the inner JWS rule set).
 type JWTRuleSet struct {
 	rules.NoConflict[*jose.JWT]
 	inner     *JWSRuleSet
@@ -22,6 +23,7 @@ type JWTRuleSet struct {
 	label     string                 // for String(); e.g. "WithRequired()", "WithClaim(sub)"
 }
 
+// JWT creates a new jose.JWT RuleSet (parses compact JWT string and validates claims and optional signature).
 func JWT() *JWTRuleSet {
 	return &JWTRuleSet{
 		inner: JWS(),

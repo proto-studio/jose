@@ -8,6 +8,7 @@ import (
 	"proto.zip/studio/jose/pkg/josevalidators"
 )
 
+// TestHeader tests that Header returns a rule set that validates alg, typ, kid, etc.
 func TestHeader(t *testing.T) {
 	// Header() returns a rule set; applying with valid header should pass
 	ctx := context.Background()
@@ -19,6 +20,7 @@ func TestHeader(t *testing.T) {
 	}
 }
 
+// TestHeader_NoneGate_RejectsWhenNoneDisabled tests that alg "none" is rejected when none is disabled.
 func TestHeader_NoneGate_RejectsWhenNoneDisabled(t *testing.T) {
 	// Unprotected header with alg "none" when jose.None() is false should fail via noneGate
 	jose.DisableNone()
@@ -36,6 +38,7 @@ func TestHeader_NoneGate_RejectsWhenNoneDisabled(t *testing.T) {
 	}
 }
 
+// TestHeader_NoneGate_AllowsWhenNoneEnabled tests that alg "none" is allowed when none is enabled.
 func TestHeader_NoneGate_AllowsWhenNoneEnabled(t *testing.T) {
 	jose.EnableNone()
 	defer jose.DisableNone()

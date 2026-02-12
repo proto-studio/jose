@@ -10,6 +10,7 @@ import (
 	"proto.zip/studio/jose/internal/base64url"
 )
 
+// RSA implements Algorithm for RS256, RS384, and RS512 using an RSA key pair.
 type RSA struct {
 	PrivateKey *rsa.PrivateKey
 	PublicKey  *rsa.PublicKey
@@ -17,6 +18,7 @@ type RSA struct {
 	alg        crypto.Hash
 }
 
+// NewRS256 returns an Algorithm that signs and verifies with RSA-SHA256.
 func NewRS256(pub *rsa.PublicKey, pri *rsa.PrivateKey) *RSA {
 	return &RSA{
 		PublicKey:  pub,
@@ -25,6 +27,7 @@ func NewRS256(pub *rsa.PublicKey, pri *rsa.PrivateKey) *RSA {
 	}
 }
 
+// NewRS384 returns an Algorithm that signs and verifies with RSA-SHA384.
 func NewRS384(pub *rsa.PublicKey, pri *rsa.PrivateKey) *RSA {
 	return &RSA{
 		PublicKey:  pub,
@@ -33,6 +36,7 @@ func NewRS384(pub *rsa.PublicKey, pri *rsa.PrivateKey) *RSA {
 	}
 }
 
+// NewRS512 returns an Algorithm that signs and verifies with RSA-SHA512.
 func NewRS512(pub *rsa.PublicKey, pri *rsa.PrivateKey) *RSA {
 	return &RSA{
 		PublicKey:  pub,
@@ -57,6 +61,7 @@ func (e *RSA) hash(protected string, payload []byte) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
+// signWithProtected produces a signature for the given protected header and payload.
 func (r *RSA) signWithProtected(protected string, payload []byte) (*Signature, error) {
 	if r.PrivateKey == nil {
 		return nil, errors.New("RSA Sign requires a private key")
@@ -77,9 +82,14 @@ func (r *RSA) signWithProtected(protected string, payload []byte) (*Signature, e
 	}, nil
 }
 
+// Sign signs the payload with the RSA private key and returns a signature with the given typ in the header.
 func (r *RSA) Sign(typ string, payload []byte) (*Signature, error) {
+	name, err := r.Name()
+	if err != nil {
+		return nil, err
+	}
 	protected := Header{
-		HeaderAlg: r.Name(),
+		HeaderAlg: name,
 		HeaderTyp: typ,
 	}
 
@@ -90,6 +100,7 @@ func (r *RSA) Sign(typ string, payload []byte) (*Signature, error) {
 	return r.signWithProtected(protected.Encoded(), payload)
 }
 
+// Verify returns true if the signature is valid for the payload.
 func (r *RSA) Verify(sig *Signature, payload []byte) bool {
 	hashed, err := r.hash(sig.Protected, payload)
 	if err != nil {
@@ -105,25 +116,31 @@ func (r *RSA) Verify(sig *Signature, payload []byte) bool {
 	return err == nil
 }
 
-func (r *RSA) Name() string {
+// Name returns the JWS algorithm name (e.g. "RS256") or an error for an unrecognized hash.
+func (r *RSA) Name() (string, error) {
 	switch r.alg {
 	case crypto.SHA256:
-		return "RS256"
+		return "RS256", nil
 	case crypto.SHA384:
-		return "RS384"
+		return "RS384", nil
 	case crypto.SHA512:
-		return "RS512"
+		return "RS512", nil
 	default:
-		panic("unrecognized algorithm")
+		return "", errors.New("jose: unrecognized algorithm")
 	}
 }
 
-func (r *RSA) AlgorithmsFor(header Header) []Algorithm {
-	if alg, ok := header["alg"]; ok && alg != r.Name() {
-		return []Algorithm{}
+// AlgorithmsFor returns the receiver in a slice if the header alg/kid match, or an empty slice.
+func (r *RSA) AlgorithmsFor(header Header) ([]Algorithm, error) {
+	name, err := r.Name()
+	if err != nil {
+		return nil, err
+	}
+	if alg, ok := header["alg"]; ok && alg != name {
+		return []Algorithm{}, nil
 	}
 	if kid, ok := header["kid"]; ok && r.Kid != "" && r.Kid != kid {
-		return []Algorithm{}
+		return []Algorithm{}, nil
 	}
-	return []Algorithm{r}
+	return []Algorithm{r}, nil
 }

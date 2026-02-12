@@ -8,6 +8,7 @@ import (
 	"proto.zip/studio/validate/pkg/rules"
 )
 
+// JWKSRuleSet validates a JSON Web Key Set (keys array of JWKs).
 type JWKSRuleSet struct {
 	rules.NoConflict[*jose.JWKS]
 	inner *rules.ObjectRuleSet[*jose.JWKS, string, any]

@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestJWKS tests NewJWKS, Add, GetByKid, and String round-trip.
 func TestJWKS(t *testing.T) {
 	// Test NewJWKS and Add
 	jwk1 := &JWK{Kty: "RSA", N: "value1", E: "value2", Kid: "key1"}
@@ -44,22 +45,30 @@ func TestJWKS(t *testing.T) {
 	}
 }
 
+// TestJWKS_AlgorithmsFor tests that AlgorithmsFor returns algorithms for matching kid and returns none for unknown kid.
 func TestJWKS_AlgorithmsFor(t *testing.T) {
 	// RSA key that can produce RS256
 	jwk, _ := NewJWK(`{"kty":"RSA","kid":"r1","n":"y4hxdh_gsACZsZpUg-l4hpdf5Qo4lUyJV1SbJRsJuqRLKTZHYhrTJ1uUDfIYNcNeemxL73zytN6SfJvBgDYThqN2OTrX_G1LMadI_CtKrV-kUZXjyY41KAcgHvPuVhhWX3ksYaKqVijT7ViOS3DG3t7AKVsD_BBIzxQ_ZaQLKG5YmG64xL6WGNdpTrBeT87-ZJ9-ojhhP2eytkjLhB6aO5kzIiXRsN_b0A0ubm2ujKkBP4tnsGGcbJzwlappWJb3qdOYXL77kcFIuxIRsfKCrb5Tuds862jpawKYZdFC_46tJ_CRieHMo-o-6XGmfp_VXvAv2FkRDbqDtnU8_mKvuQ","e":"AQAB"}`)
 	jwks := NewJWKS(jwk)
 	head := Header{"alg": "RS256", "kid": "r1"}
-	algs := jwks.AlgorithmsFor(head)
+	algs, err := jwks.AlgorithmsFor(&head)
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(algs) != 1 {
 		t.Errorf("AlgorithmsFor len = %d, want 1", len(algs))
 	}
 	head["kid"] = "nonexistent"
-	algs = jwks.AlgorithmsFor(head)
+	algs, err = jwks.AlgorithmsFor(&head)
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(algs) != 0 {
 		t.Errorf("AlgorithmsFor(nonexistent kid) len = %d, want 0", len(algs))
 	}
 }
 
+// TestJWKS_String_MarshalError tests that String returns "{}" when JSON marshal fails.
 func TestJWKS_String_MarshalError(t *testing.T) {
 	old := jsonMarshalJWKS
 	jsonMarshalJWKS = func(interface{}) ([]byte, error) { return nil, errors.New("fail") }

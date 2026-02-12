@@ -39,8 +39,10 @@ var baseHeaderRuleSet rules.RuleSet[map[string]any] = rules.StringMap[any]().
 	WithKey("cty", ctyRuleSet.Any()).
 	WithKey("jku", jkuRuleSet.Any())
 
+// HeaderRuleSet validates a JWS/JWT header (alg, typ, kid, etc.).
 type HeaderRuleSet rules.RuleSet[map[string]any]
 
+// Header returns a rule set for validating JOSE headers.
 func Header() HeaderRuleSet {
 	return baseHeaderRuleSet
 }

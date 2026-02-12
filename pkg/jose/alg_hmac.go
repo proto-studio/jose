@@ -8,12 +8,14 @@ import (
 	"proto.zip/studio/jose/internal/base64url"
 )
 
+// HMAC implements Algorithm for HS256, HS384, and HS512 using a shared secret.
 type HMAC struct {
 	secret []byte
 	alg    crypto.Hash
 	Kid    string
 }
 
+// NewHS256 returns an Algorithm that signs and verifies with HMAC-SHA256.
 func NewHS256(secret []byte) *HMAC {
 	return &HMAC{
 		secret: secret,
@@ -21,6 +23,7 @@ func NewHS256(secret []byte) *HMAC {
 	}
 }
 
+// NewHS384 returns an Algorithm that signs and verifies with HMAC-SHA384.
 func NewHS384(secret []byte) *HMAC {
 	return &HMAC{
 		secret: secret,
@@ -28,6 +31,7 @@ func NewHS384(secret []byte) *HMAC {
 	}
 }
 
+// NewH256 returns an Algorithm that signs and verifies with HMAC-SHA256 (alias for NewHS256).
 func NewH256(secret []byte) *HMAC {
 	return &HMAC{
 		secret: secret,
@@ -35,6 +39,7 @@ func NewH256(secret []byte) *HMAC {
 	}
 }
 
+// NewHS512 returns an Algorithm that signs and verifies with HMAC-SHA512.
 func NewHS512(secret []byte) *HMAC {
 	return &HMAC{
 		secret: secret,
@@ -59,9 +64,14 @@ func (h *HMAC) signWithProtected(protected string, payload []byte) (*Signature, 
 	}, nil
 }
 
+// Sign signs the payload with HMAC and returns a signature with the given typ in the header.
 func (h *HMAC) Sign(typ string, payload []byte) (*Signature, error) {
+	name, err := h.Name()
+	if err != nil {
+		return nil, err
+	}
 	protected := Header{
-		HeaderAlg: h.Name(),
+		HeaderAlg: name,
 		HeaderTyp: typ,
 	}
 	if h.Kid != "" {
@@ -71,6 +81,7 @@ func (h *HMAC) Sign(typ string, payload []byte) (*Signature, error) {
 	return h.signWithProtected(protected.Encoded(), payload)
 }
 
+// Verify returns true if the signature is valid for the payload.
 func (h *HMAC) Verify(sig *Signature, payload []byte) bool {
 	expected, err := h.signWithProtected(sig.Protected, payload)
 	if err != nil {
@@ -86,25 +97,31 @@ func (h *HMAC) Verify(sig *Signature, payload []byte) bool {
 	return hmac.Equal(actualSig, expectedSig)
 }
 
-func (h *HMAC) Name() string {
+// Name returns the JWS algorithm name (e.g. "HS256") or an error for an unrecognized hash.
+func (h *HMAC) Name() (string, error) {
 	switch h.alg {
 	case crypto.SHA256:
-		return "HS256"
+		return "HS256", nil
 	case crypto.SHA384:
-		return "HS384"
+		return "HS384", nil
 	case crypto.SHA512:
-		return "HS512"
+		return "HS512", nil
 	default:
-		panic("unrecognized algorithm")
+		return "", errors.New("jose: unrecognized algorithm")
 	}
 }
 
-func (r *HMAC) AlgorithmsFor(header Header) []Algorithm {
-	if alg, ok := header["alg"]; ok && alg != r.Name() {
-		return []Algorithm{}
+// AlgorithmsFor returns the receiver in a slice if the header alg/kid match, or an empty slice.
+func (r *HMAC) AlgorithmsFor(header Header) ([]Algorithm, error) {
+	name, err := r.Name()
+	if err != nil {
+		return nil, err
+	}
+	if alg, ok := header["alg"]; ok && alg != name {
+		return []Algorithm{}, nil
 	}
 	if kid, ok := header["kid"]; ok && r.Kid != "" && r.Kid != kid {
-		return []Algorithm{}
+		return []Algorithm{}, nil
 	}
-	return []Algorithm{r}
+	return []Algorithm{r}, nil
 }

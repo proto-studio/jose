@@ -16,28 +16,39 @@ func mustRSAKey(t *testing.T, bits int) (*rsa.PrivateKey, *rsa.PublicKey) {
 	return key, &key.PublicKey
 }
 
+// TestNewRS384 tests that NewRS384 returns a non-nil algorithm with Name RS384.
 func TestNewRS384(t *testing.T) {
 	priv, pub := mustRSAKey(t, 2048)
 	alg := NewRS384(pub, priv)
 	if alg == nil {
 		t.Fatal("NewRS384 returned nil")
 	}
-	if alg.Name() != "RS384" {
-		t.Errorf("Name() = %s, want RS384", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "RS384" {
+		t.Errorf("Name() = %s, want RS384", name)
 	}
 }
 
+// TestNewRS512 tests that NewRS512 returns a non-nil algorithm with Name RS512.
 func TestNewRS512(t *testing.T) {
 	priv, pub := mustRSAKey(t, 2048)
 	alg := NewRS512(pub, priv)
 	if alg == nil {
 		t.Fatal("NewRS512 returned nil")
 	}
-	if alg.Name() != "RS512" {
-		t.Errorf("Name() = %s, want RS512", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "RS512" {
+		t.Errorf("Name() = %s, want RS512", name)
 	}
 }
 
+// TestRSA_SignVerify tests that Sign produces a verifiable signature and Verify rejects wrong payload.
 func TestRSA_SignVerify(t *testing.T) {
 	priv, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, priv)
@@ -57,6 +68,7 @@ func TestRSA_SignVerify(t *testing.T) {
 	}
 }
 
+// TestRSA_VerifyBadSignature tests that Verify returns false for an invalid signature.
 func TestRSA_VerifyBadSignature(t *testing.T) {
 	_, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, nil)
@@ -66,6 +78,7 @@ func TestRSA_VerifyBadSignature(t *testing.T) {
 	}
 }
 
+// TestRSA_VerifyInvalidBase64Signature tests that Verify returns false for invalid base64 in the signature.
 func TestRSA_VerifyInvalidBase64Signature(t *testing.T) {
 	_, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, nil)
@@ -75,6 +88,7 @@ func TestRSA_VerifyInvalidBase64Signature(t *testing.T) {
 	}
 }
 
+// TestRSA_Sign_NilPrivateKey tests that Sign returns an error when the private key is nil.
 func TestRSA_Sign_NilPrivateKey(t *testing.T) {
 	_, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, nil)
@@ -84,6 +98,7 @@ func TestRSA_Sign_NilPrivateKey(t *testing.T) {
 	}
 }
 
+// TestRSA_Sign_WithKid tests that Sign includes kid in the header when set.
 func TestRSA_Sign_WithKid(t *testing.T) {
 	priv, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, priv)
@@ -97,19 +112,20 @@ func TestRSA_Sign_WithKid(t *testing.T) {
 	}
 }
 
-// Name() with unrecognized alg panics.
-func TestRSA_Name_UnrecognizedPanics(t *testing.T) {
+// TestRSA_Name_UnrecognizedReturnsError verifies that Name returns an error for an unrecognized algorithm.
+func TestRSA_Name_UnrecognizedReturnsError(t *testing.T) {
 	_, pub := mustRSAKey(t, 2048)
 	alg := &RSA{PublicKey: pub, alg: crypto.Hash(999)}
-	defer func() {
-		if rec := recover(); rec == nil {
-			t.Error("Name() with unrecognized alg should panic")
-		}
-	}()
-	alg.Name()
+	name, err := alg.Name()
+	if err == nil {
+		t.Error("Name() with unrecognized alg should return error")
+	}
+	if name != "" {
+		t.Errorf("Name() on unrecognized alg = %q, want empty string", name)
+	}
 }
 
-// hash error path (simulated via test hook)
+// TestRSA_hash_Error tests Sign and Verify when the hash step fails (simulated via test hook).
 func TestRSA_hash_Error(t *testing.T) {
 	hashErrorForTestRSA = errors.New("hash fail")
 	defer func() { hashErrorForTestRSA = nil }()
@@ -127,7 +143,7 @@ func TestRSA_hash_Error(t *testing.T) {
 	}
 }
 
-// Sign two payloads, swap signatures: verify A with B's signature must be false.
+// TestRSA_Verify_SwappedSignature tests that Verify returns false when the signature is from a different payload.
 func TestRSA_Verify_SwappedSignature(t *testing.T) {
 	priv, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, priv)
@@ -138,24 +154,37 @@ func TestRSA_Verify_SwappedSignature(t *testing.T) {
 	}
 }
 
+// TestRSA_AlgorithmsFor tests that AlgorithmsFor returns the algorithm only when alg and kid match.
 func TestRSA_AlgorithmsFor(t *testing.T) {
 	_, pub := mustRSAKey(t, 2048)
 	alg := NewRS256(pub, nil)
 	alg.Kid = "mykid"
 
-	got := alg.AlgorithmsFor(Header{"alg": "RS256"})
+	got, err := alg.AlgorithmsFor(Header{"alg": "RS256"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 1 {
 		t.Errorf("AlgorithmsFor(alg=RS256) len = %d, want 1", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "ES256"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "ES256"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("AlgorithmsFor(alg=ES256) len = %d, want 0", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "RS256", "kid": "mykid"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "RS256", "kid": "mykid"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 1 {
 		t.Errorf("AlgorithmsFor(kid=mykid) len = %d, want 1", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "RS256", "kid": "other"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "RS256", "kid": "other"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("AlgorithmsFor(kid=other) len = %d, want 0", len(got))
 	}

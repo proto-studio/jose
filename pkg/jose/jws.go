@@ -45,21 +45,25 @@ const (
 // Header represents the header section of a JWS.
 type Header map[string]any
 
+// Encoded returns the base64url-encoded JSON of the header.
 func (h Header) Encoded() string {
 	data, _ := json.Marshal(h)
 	return base64url.Encode(data)
 }
 
+// Signature holds the protected header, optional unprotected header, and signature value for one signer.
 type Signature struct {
 	Protected string `json:"protected,omitempty"`
 	Header    Header `json:"header,omitempty"`
 	Signature string `json:"signature"`
 }
 
+// Decoded returns the raw signature bytes from the base64url-encoded Signature field.
 func (sig *Signature) Decoded() ([]byte, error) {
 	return base64url.Decode(sig.Signature)
 }
 
+// JWS is a JSON Web Signature: signed or MACed payload with one or more signatures.
 type JWS struct {
 	Payload string `json:"payload"`
 

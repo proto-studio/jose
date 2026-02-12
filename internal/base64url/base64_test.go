@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// TestEncode tests that Encode produces output that Decode round-trips correctly.
 func TestEncode(t *testing.T) {
 	out := Encode([]byte("hello"))
 	if out == "" {
@@ -18,6 +19,7 @@ func TestEncode(t *testing.T) {
 	}
 }
 
+// TestDecode tests Decode with and without padding and with invalid input.
 func TestDecode(t *testing.T) {
 	// No padding
 	dec, err := Decode("aGVsbG8")

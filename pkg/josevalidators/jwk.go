@@ -9,6 +9,7 @@ import (
 	"proto.zip/studio/validate/pkg/rules"
 )
 
+// JWKRuleSet validates a JSON Web Key (alg, kty, crv, kid, etc.).
 type JWKRuleSet struct {
 	rules.NoConflict[*jose.JWK]
 	inner  *rules.ObjectRuleSet[*jose.JWK, string, any]

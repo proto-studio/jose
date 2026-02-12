@@ -5,26 +5,37 @@ import (
 	"testing"
 )
 
+// TestNewHS256 tests that NewHS256 returns a non-nil algorithm with Name HS256.
 func TestNewHS256(t *testing.T) {
 	alg := NewHS256([]byte("secret"))
 	if alg == nil {
 		t.Fatal("NewHS256 returned nil")
 	}
-	if alg.Name() != "HS256" {
-		t.Errorf("Name() = %s, want HS256", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "HS256" {
+		t.Errorf("Name() = %s, want HS256", name)
 	}
 }
 
+// TestNewHS384 tests that NewHS384 returns a non-nil algorithm with Name HS384.
 func TestNewHS384(t *testing.T) {
 	alg := NewHS384([]byte("secret"))
 	if alg == nil {
 		t.Fatal("NewHS384 returned nil")
 	}
-	if alg.Name() != "HS384" {
-		t.Errorf("Name() = %s, want HS384", alg.Name())
+	name, err := alg.Name()
+	if err != nil {
+		t.Fatalf("Name(): %v", err)
+	}
+	if name != "HS384" {
+		t.Errorf("Name() = %s, want HS384", name)
 	}
 }
 
+// TestHMAC_Verify tests that Sign produces a verifiable signature and Verify rejects wrong payload.
 func TestHMAC_Verify(t *testing.T) {
 	secret := []byte("my-secret")
 	alg := NewHS256(secret)
@@ -41,18 +52,28 @@ func TestHMAC_Verify(t *testing.T) {
 	}
 }
 
+// TestHMAC_Name tests that Name returns HS256, HS384, HS512 for the respective constructors.
 func TestHMAC_Name(t *testing.T) {
-	if NewHS256(nil).Name() != "HS256" {
-		t.Error("HS256 Name() mismatch")
-	}
-	if NewHS384(nil).Name() != "HS384" {
-		t.Error("HS384 Name() mismatch")
-	}
-	if NewHS512(nil).Name() != "HS512" {
-		t.Error("HS512 Name() mismatch")
+	for _, tc := range []struct {
+		alg  *HMAC
+		want string
+	}{
+		{NewHS256(nil), "HS256"},
+		{NewHS384(nil), "HS384"},
+		{NewHS512(nil), "HS512"},
+	} {
+		name, err := tc.alg.Name()
+		if err != nil {
+			t.Errorf("%s Name(): %v", tc.want, err)
+			continue
+		}
+		if name != tc.want {
+			t.Errorf("%s Name() = %s", tc.want, name)
+		}
 	}
 }
 
+// TestHMAC_Sign_WithKid tests that Sign includes kid in the header when set.
 func TestHMAC_Sign_WithKid(t *testing.T) {
 	alg := NewHS256([]byte("secret"))
 	alg.Kid = "mykid"
@@ -68,6 +89,7 @@ func TestHMAC_Sign_WithKid(t *testing.T) {
 	}
 }
 
+// TestHMAC_Verify_InvalidBase64Sig tests that Verify returns false for invalid base64 in the signature.
 func TestHMAC_Verify_InvalidBase64Sig(t *testing.T) {
 	alg := NewHS256([]byte("x"))
 	sig := &Signature{Protected: "e30", Signature: "!!!"}
@@ -76,18 +98,19 @@ func TestHMAC_Verify_InvalidBase64Sig(t *testing.T) {
 	}
 }
 
-// Name() with unrecognized alg panics.
-func TestHMAC_Name_UnrecognizedPanics(t *testing.T) {
+// TestHMAC_Name_UnrecognizedReturnsError verifies that Name returns an error for an unrecognized algorithm.
+func TestHMAC_Name_UnrecognizedReturnsError(t *testing.T) {
 	h := &HMAC{alg: crypto.Hash(999)}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Name() with unrecognized alg should panic")
-		}
-	}()
-	h.Name()
+	name, err := h.Name()
+	if err == nil {
+		t.Error("Name() with unrecognized alg should return error")
+	}
+	if name != "" {
+		t.Errorf("Name() on unrecognized alg = %q, want empty string", name)
+	}
 }
 
-// Verify when signWithProtected fails (nil secret) returns false.
+// TestHMAC_Verify_NilSecret tests that Verify returns false when the verifier has a nil secret.
 func TestHMAC_Verify_NilSecret(t *testing.T) {
 	alg := NewHS256([]byte("secret"))
 	sig, _ := alg.Sign("JWT", []byte("x"))
@@ -97,7 +120,7 @@ func TestHMAC_Verify_NilSecret(t *testing.T) {
 	}
 }
 
-// Sign two payloads, swap signatures: verify A with B's signature must be false.
+// TestHMAC_Verify_SwappedSignature tests that Verify returns false when the signature is from a different payload.
 func TestHMAC_Verify_SwappedSignature(t *testing.T) {
 	alg := NewHS256([]byte("s"))
 	sigA, _ := alg.Sign("JWT", []byte("A"))
@@ -107,19 +130,29 @@ func TestHMAC_Verify_SwappedSignature(t *testing.T) {
 	}
 }
 
+// TestHMAC_AlgorithmsFor tests that AlgorithmsFor returns the algorithm only when alg and kid match.
 func TestHMAC_AlgorithmsFor(t *testing.T) {
 	alg := NewHS256([]byte("x"))
 	alg.Kid = "mykid"
 
-	got := alg.AlgorithmsFor(Header{"alg": "HS256"})
+	got, err := alg.AlgorithmsFor(Header{"alg": "HS256"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 1 {
 		t.Errorf("AlgorithmsFor(alg=HS256) len = %d, want 1", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "HS384"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "HS384"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("AlgorithmsFor(alg=HS384) len = %d, want 0", len(got))
 	}
-	got = alg.AlgorithmsFor(Header{"alg": "HS256", "kid": "other"})
+	got, err = alg.AlgorithmsFor(Header{"alg": "HS256", "kid": "other"})
+	if err != nil {
+		t.Fatalf("AlgorithmsFor: %v", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("AlgorithmsFor(kid=other) len = %d, want 0", len(got))
 	}

@@ -11,6 +11,7 @@ import (
 	"proto.zip/studio/jose/internal/base64url"
 )
 
+// ECDSA implements Algorithm for ES256, ES384, and ES512 using an ECDSA key pair.
 type ECDSA struct {
 	PrivateKey *ecdsa.PrivateKey
 	PublicKey  *ecdsa.PublicKey
@@ -18,6 +19,7 @@ type ECDSA struct {
 	alg        crypto.Hash
 }
 
+// NewES256 returns an Algorithm that signs and verifies with ECDSA P-256 and SHA-256.
 func NewES256(pub *ecdsa.PublicKey, pri *ecdsa.PrivateKey) *ECDSA {
 	return &ECDSA{
 		PublicKey:  pub,
@@ -26,6 +28,7 @@ func NewES256(pub *ecdsa.PublicKey, pri *ecdsa.PrivateKey) *ECDSA {
 	}
 }
 
+// NewES384 returns an Algorithm that signs and verifies with ECDSA P-384 and SHA-384.
 func NewES384(pub *ecdsa.PublicKey, pri *ecdsa.PrivateKey) *ECDSA {
 	return &ECDSA{
 		PublicKey:  pub,
@@ -34,6 +37,7 @@ func NewES384(pub *ecdsa.PublicKey, pri *ecdsa.PrivateKey) *ECDSA {
 	}
 }
 
+// NewES512 returns an Algorithm that signs and verifies with ECDSA P-521 and SHA-512.
 func NewES512(pub *ecdsa.PublicKey, pri *ecdsa.PrivateKey) *ECDSA {
 	return &ECDSA{
 		PublicKey:  pub,
@@ -58,9 +62,14 @@ func (e *ECDSA) hash(protected string, payload []byte) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
+// Sign signs the payload with the ECDSA private key and returns a signature with the given typ in the header.
 func (e *ECDSA) Sign(typ string, payload []byte) (*Signature, error) {
+	name, err := e.Name()
+	if err != nil {
+		return nil, err
+	}
 	protected := Header{
-		HeaderAlg: e.Name(),
+		HeaderAlg: name,
 		HeaderTyp: typ,
 	}
 	if e.Kid != "" {
@@ -96,6 +105,7 @@ func (e *ECDSA) Sign(typ string, payload []byte) (*Signature, error) {
 
 }
 
+// Verify returns true if the signature is valid for the payload.
 func (e *ECDSA) Verify(sig *Signature, payload []byte) bool {
 	signature, err := base64url.Decode(sig.Signature)
 	if err != nil {
@@ -115,25 +125,31 @@ func (e *ECDSA) Verify(sig *Signature, payload []byte) bool {
 	return ecdsa.Verify(e.PublicKey, hash[:], r, s)
 }
 
-func (r *ECDSA) Name() string {
+// Name returns the JWS algorithm name (e.g. "ES256") or an error for an unrecognized hash.
+func (r *ECDSA) Name() (string, error) {
 	switch r.alg {
 	case crypto.SHA256:
-		return "ES256"
+		return "ES256", nil
 	case crypto.SHA384:
-		return "ES384"
+		return "ES384", nil
 	case crypto.SHA512:
-		return "ES512"
+		return "ES512", nil
 	default:
-		panic("unrecognized algorithm")
+		return "", errors.New("jose: unrecognized algorithm")
 	}
 }
 
-func (r *ECDSA) AlgorithmsFor(header Header) []Algorithm {
-	if alg, ok := header["alg"]; ok && alg != r.Name() {
-		return []Algorithm{}
+// AlgorithmsFor returns the receiver in a slice if the header alg/kid match, or an empty slice.
+func (r *ECDSA) AlgorithmsFor(header Header) ([]Algorithm, error) {
+	name, err := r.Name()
+	if err != nil {
+		return nil, err
+	}
+	if alg, ok := header["alg"]; ok && alg != name {
+		return []Algorithm{}, nil
 	}
 	if kid, ok := header["kid"]; ok && r.Kid != "" && r.Kid != kid {
-		return []Algorithm{}
+		return []Algorithm{}, nil
 	}
-	return []Algorithm{r}
+	return []Algorithm{r}, nil
 }
