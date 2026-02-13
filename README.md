@@ -100,8 +100,8 @@ func main() {
 
 	ctx := context.Background()
 	token := "eyJhbGciOiJub25lIn0.eyJzY29wZSI6Im9wZW5pZCJ9."
-	var jwt *jose.JWT
-	if err := ruleSet.Apply(ctx, token, &jwt); err != nil {
+	jwt, err := ruleSet.Apply(ctx, token)
+	if err != nil {
 		fmt.Println(err)
 		return
 	}
