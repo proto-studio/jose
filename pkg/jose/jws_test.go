@@ -364,3 +364,40 @@ func TestJWS_Verify_ExpandedForm_NoMatch(t *testing.T) {
 		t.Error("Verify with wrong JWK (expanded form) should be false")
 	}
 }
+
+// TestParseCompactJWS tests parsing compact JWS strings.
+func TestParseCompactJWS(t *testing.T) {
+	// Valid 3-part (signature is base64url-encoded; "AQID" decodes to 3 bytes)
+	compact := "eyJhbGciOiJIUzI1NiJ9.e30.AQID"
+	jws, err := jose.ParseCompactJWS(compact)
+	if err != nil {
+		t.Fatalf("ParseCompactJWS: %v", err)
+	}
+	if jws.Protected != "eyJhbGciOiJIUzI1NiJ9" || jws.Payload != "e30" || jws.Signature != "AQID" {
+		t.Errorf("ParseCompactJWS: got Protected=%q Payload=%q Signature=%q", jws.Protected, jws.Payload, jws.Signature)
+	}
+	// Valid 2-part (unsigned)
+	compact2 := "eyJhbGciOiJub25lIn0.e30"
+	jws2, err := jose.ParseCompactJWS(compact2)
+	if err != nil {
+		t.Fatalf("ParseCompactJWS(2-part): %v", err)
+	}
+	if jws2.Signature != "" {
+		t.Errorf("expected empty signature, got %q", jws2.Signature)
+	}
+	// Invalid: one part
+	_, err = jose.ParseCompactJWS("onlyone")
+	if err == nil {
+		t.Fatal("expected error for 1 part")
+	}
+	// Invalid: four parts
+	_, err = jose.ParseCompactJWS("a.b.c.d")
+	if err == nil {
+		t.Fatal("expected error for 4 parts")
+	}
+	// Invalid base64 in header
+	_, err = jose.ParseCompactJWS("!!!.e30.sig")
+	if err == nil {
+		t.Fatal("expected error for invalid protected")
+	}
+}

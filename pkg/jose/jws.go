@@ -3,6 +3,8 @@ package jose
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"proto.zip/studio/jose/internal/base64url"
 )
@@ -292,4 +294,30 @@ func (jws *JWS) FullHeader() (Header, error) {
 	}
 
 	return header, nil
+}
+
+// ParseCompactJWS parses a compact JWS string (header.payload[.signature]) into a JWS.
+// Returns an error if the string does not have 2 or 3 dot-separated base64url-encoded parts.
+func ParseCompactJWS(compact string) (*JWS, error) {
+	parts := strings.Split(compact, ".")
+	if len(parts) < 2 || len(parts) > 3 {
+		return nil, errors.New("compact JWS must have 2 or 3 parts")
+	}
+	if _, err := base64url.Decode(parts[0]); err != nil {
+		return nil, fmt.Errorf("invalid protected header: %w", err)
+	}
+	if _, err := base64url.Decode(parts[1]); err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+	jws := &JWS{
+		Protected: parts[0],
+		Payload:   parts[1],
+	}
+	if len(parts) == 3 {
+		if _, err := base64url.Decode(parts[2]); err != nil {
+			return nil, fmt.Errorf("invalid signature: %w", err)
+		}
+		jws.Signature = parts[2]
+	}
+	return jws, nil
 }

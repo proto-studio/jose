@@ -1,5 +1,7 @@
 # Build and binaries
 /bin/
+/gojose
+key.json
 *.exe
 *.exe~
 *.dll

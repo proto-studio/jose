@@ -21,6 +21,57 @@ Features:
 - Validation rule sets for JWS, JWT, JWK, and JWKS with clear, structured errors from `proto.zip/studio/validate`.
 - Optional signature verification via `WithVerifyJWK`, `WithJWKS`, or `WithJWKSURL`; `exp`/`nbf` checks; custom claim rules.
 
+## Installation
+
+### Library
+
+```bash
+go get proto.zip/studio/jose
+```
+
+### gojose CLI
+
+To install the **gojose** command-line tool (create keys, sign JWS, verify JWS/JWT):
+
+```bash
+go install proto.zip/studio/jose/cmd/gojose@latest
+```
+
+Or build from a clone:
+
+```bash
+git clone https://github.com/proto-studio/jose
+cd jose
+go build -o gojose ./cmd/gojose
+./gojose keys create -alg ES256 -format jwk
+```
+
+**Commands:**
+
+| Command        | Description |
+|----------------|-------------|
+| `keys create`  | Create a new key; output as JWK or PEM (`-format jwk` or `-format pem`). Algorithms: `HS256`, `RS256`, `ES256`. |
+| `sign`        | Sign a JWS: key from file (`-key`), header `-alg` and optional `-kid`, payload from stdin. |
+| `verify-jws`  | Verify a compact JWS; key from a JWK file, JWKS file, or JWKS URL (`-key`); token from stdin or `-token`. Outputs decoded payload. |
+| `verify-jwt`  | Verify a JWT (same key sources); token from stdin or `-token`. Outputs claims as JSON. |
+
+**Examples:**
+
+```bash
+# Create an ES256 key (JWK)
+gojose keys create -alg ES256 -format jwk -kid mykey > key.json
+
+# Create an RSA key (PEM)
+gojose keys create -alg RS256 -format pem -kid rsa1 > key.pem
+
+# Sign payload (stdin) with key file
+echo -n '{"sub":"user123"}' | gojose sign -key key.json -alg ES256 -kid mykey
+
+# Verify JWT (stdin or -token)
+gojose verify-jwt -key key.json < token.jwt
+gojose verify-jwt -key https://example.com/.well-known/jwks.json -token "$TOKEN"
+```
+
 ## Getting Started
 
 ### Quick Start

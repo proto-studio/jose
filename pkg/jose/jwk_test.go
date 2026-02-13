@@ -377,6 +377,33 @@ func TestJWK_Algorithm_Unsupported(t *testing.T) {
 	}
 }
 
+// TestJWK_Algorithm_Oct tests that oct (symmetric) JWK returns HMAC algorithms.
+func TestJWK_Algorithm_Oct(t *testing.T) {
+	// k = base64url("secret") = c2VjcmV0
+	jwk, err := NewJWK(`{"kty":"oct","k":"c2VjcmV0","alg":"HS256"}`)
+	if err != nil {
+		t.Fatalf("NewJWK: %v", err)
+	}
+	alg, err := jwk.Algorithm("HS256")
+	if err != nil {
+		t.Fatalf("Algorithm(HS256): %v", err)
+	}
+	if alg == nil {
+		t.Fatal("expected non-nil algorithm")
+	}
+	name, _ := alg.Name()
+	if name != "HS256" {
+		t.Errorf("Name() = %s, want HS256", name)
+	}
+	// Verify with JWS
+	jws := &JWS{Protected: "eyJhbGciOiJIUzI1NiJ9", Payload: "e30", Signature: ""}
+	signer := NewHS256([]byte("secret"))
+	_ = jws.SignWithType("JWT", signer)
+	if !jws.Verify(jwk) {
+		t.Error("Verify(jwk) with oct key should succeed")
+	}
+}
+
 // TestJWK_algorithmEC_UnknownAlg tests that algorithmEC returns an error for an unknown EC alg.
 func TestJWK_algorithmEC_UnknownAlg(t *testing.T) {
 	jwk, _ := NewJWK(`{"kty":"EC","crv":"P-256","x":"V-WK2nXgu7A-Qw0Ucc4DRDZihdkw1UdmE1tjnwrItIE","y":"d8353CKrkzkL1RfbOpqpkijnX4GvEaVWt_bcaI3GBys"}`)

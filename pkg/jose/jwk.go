@@ -294,6 +294,26 @@ func (j *JWK) algorithmEC(alg string) (Algorithm, error) {
 	return nil, fmt.Errorf("unknown EC algorithm: %s", alg)
 }
 
+// algorithmHMAC returns an HMAC algorithm for oct keys.
+func (j *JWK) algorithmHMAC(alg string) (Algorithm, error) {
+	if j.Kty != "oct" {
+		return nil, errors.New("JWK is not an oct key")
+	}
+	secret, err := base64url.Decode(j.K)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode k: %v", err)
+	}
+	switch alg {
+	case "HS256":
+		return NewHS256(secret), nil
+	case "HS384":
+		return NewHS384(secret), nil
+	case "HS512":
+		return NewHS512(secret), nil
+	}
+	return nil, fmt.Errorf("unknown HMAC algorithm: %s", alg)
+}
+
 // Algorithm returns an algorithm for the specific key if the key is compatible.
 // It does not enforce any hints (such as the Alg value).
 //
@@ -304,6 +324,8 @@ func (j *JWK) Algorithm(alg string) (Algorithm, error) {
 		return j.algorithmRSA(alg)
 	case "ES256", "ES384", "ES512":
 		return j.algorithmEC(alg)
+	case "HS256", "HS384", "HS512":
+		return j.algorithmHMAC(alg)
 	}
 	return nil, fmt.Errorf("unsupported algorithm")
 }
