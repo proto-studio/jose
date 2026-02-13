@@ -3,8 +3,9 @@
 [![Tests](https://github.com/proto-studio/jose/actions/workflows/tests.yml/badge.svg)](https://github.com/proto-studio/jose/actions/workflows/tests.yml)
 [![GoDoc](https://pkg.go.dev/badge/proto.zip/studio/jose)](https://pkg.go.dev/proto.zip/studio/jose)
 [![codecov](https://codecov.io/gh/proto-studio/jose/graph/badge.svg)](https://codecov.io/gh/proto-studio/jose)
-[![Go Report Card](https://goreportcard.com/badge/proto.zip/studio/jose)](https://goreportcard.com/report/proto.zip/studio/jose)
 [![Discord Chat](https://img.shields.io/badge/Discord-chat-blue?logo=Discord&logoColor=white)](https://proto.studio/social/discord)
+
+> ⚠️ **Warning:** This is prerelease software and has not yet been rigorously tested. Use at your own risk in production environments.
 
 This library is a Go implementation of **JOSE** (JSON Object Signing and Encryption) and **JWT** (JSON Web Token): parsing, signing, verification, JWK/JWKS handling, and validation with declarative rules.
 
@@ -100,8 +101,8 @@ func main() {
 
 	ctx := context.Background()
 	token := "eyJhbGciOiJub25lIn0.eyJzY29wZSI6Im9wZW5pZCJ9."
-	jwt, err := ruleSet.Apply(ctx, token)
-	if err != nil {
+	var jwt *jose.JWT
+	if err := ruleSet.Apply(ctx, token, &jwt); err != nil {
 		fmt.Println(err)
 		return
 	}
