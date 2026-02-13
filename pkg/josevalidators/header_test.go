@@ -13,8 +13,7 @@ func TestHeader(t *testing.T) {
 	// Header() returns a rule set; applying with valid header should pass
 	ctx := context.Background()
 	header := map[string]any{"alg": "HS256", "typ": "JWT"}
-	var out map[string]any
-	err := josevalidators.Header().Apply(ctx, header, &out)
+	_, err := josevalidators.Header().Apply(ctx, header)
 	if err != nil {
 		t.Errorf("Header().Apply: %v", err)
 	}

@@ -2,7 +2,6 @@ package josevalidators
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"time"
 
@@ -88,55 +87,35 @@ func (ruleSet *JWTRuleSet) WithTime(t time.Time) *JWTRuleSet {
 	return ruleSet.clone(jwtWithEvalTime(&tcopy), jwtWithLabel("WithTime()"))
 }
 
-// Apply performs a validation of a RuleSet against a value and returns a JWT value or
-// a ValidationError.
-func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationError {
-	var jws *jose.JWS
-	if err := ruleSet.inner.Apply(ctx, input, &jws); err != nil {
-		return err
+// Apply coerces value into a *jose.JWT, evaluates all rules, and returns the result or a ValidationError.
+func (ruleSet *JWTRuleSet) Apply(ctx context.Context, input any) (*jose.JWT, errors.ValidationError) {
+	jws, err := ruleSet.inner.Apply(ctx, input)
+	if err != nil {
+		return nil, err
 	}
 
 	jwt, conversionErr := jose.JWTFromJWS(jws)
 	if conversionErr != nil {
-		return errors.Errorf(errors.CodeType, ctx, "Unable to convert JWS to JWT", "Unable to convert JWS to JWT")
+		return nil, errors.Errorf(errors.CodeType, ctx, "Unable to convert JWS to JWT", "Unable to convert JWS to JWT")
 	}
 
-	var newClaims map[string]any
-	if err := rules.StringMap[any]().
+	newClaims, err := rules.StringMap[any]().
 		WithUnknown().
 		WithKey(jose.ExpirationKey, rules.Int64().Any()).
 		WithKey(jose.NotBeforeKey, rules.Int64().Any()).
-		Apply(ctx, jwt.Claims, &newClaims); err != nil {
-		return err
+		Apply(ctx, jwt.Claims)
+	if err != nil {
+		return nil, err
 	}
 
 	jwt.Claims = newClaims
 
 	// Pass the original parsed JWS so inner rules (e.g. Verify) run against it, not a rebuilt JWS.
 	if err := ruleSet.evaluate(ctx, jwt, jws); err != nil {
-		return err
+		return nil, err
 	}
 
-	outputVal := reflect.ValueOf(output)
-	outputElem := outputVal.Elem()
-
-	if outputElem.Kind() == reflect.Interface && outputElem.IsNil() {
-		outputElem.Set(reflect.ValueOf(jwt))
-	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jwt)) {
-		outputElem.Set(reflect.ValueOf(jwt))
-	} else if outputElem.Type().AssignableTo(reflect.TypeOf(*jwt)) {
-		outputElem.Set(reflect.ValueOf(*jwt))
-	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jws)) {
-		outputElem.Set(reflect.ValueOf(jws))
-	} else if outputElem.Type().AssignableTo(reflect.TypeOf(*jws)) {
-		outputElem.Set(reflect.ValueOf(*jws))
-	} else {
-		return errors.Errorf(
-			errors.CodeInternal, ctx, "Cannot assign", "Cannot assign %T to %T", jwt, outputElem.Interface(),
-		)
-	}
-
-	return nil
+	return jwt, nil
 }
 
 // Evaluate runs all validation rules for the given JWT. Apply calls evaluate(ctx, jwt, jws) so
@@ -199,8 +178,8 @@ func (ruleSet *JWTRuleSet) applyClaimRules(ctx context.Context, value *jose.JWT)
 	for current != nil {
 		if current.claimName != "" && current.claimRule != nil {
 			claimVal := currentClaims[current.claimName]
-			var result any
-			if err := current.claimRule.Apply(ctx, claimVal, &result); err != nil {
+			result, err := current.claimRule.Apply(ctx, claimVal)
+			if err != nil {
 				errs = append(errs, err)
 			} else {
 				currentClaims[current.claimName] = result

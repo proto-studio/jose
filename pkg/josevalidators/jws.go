@@ -2,7 +2,6 @@ package josevalidators
 
 import (
 	"context"
-	"reflect"
 	"strings"
 
 	"proto.zip/studio/jose/internal/base64url"
@@ -45,39 +44,18 @@ func (ruleSet *JWSRuleSet) WithRequired() *JWSRuleSet {
 	}
 }
 
-// Apply performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationError.
-func (ruleSet *JWSRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationError {
-	// Ensure output is a non-nil pointer
-	outputVal := reflect.ValueOf(output)
-	if outputVal.Kind() != reflect.Ptr || outputVal.IsNil() {
-		return errors.Errorf(
-			errors.CodeInternal, ctx, "Output must be a non-nil pointer", "Output must be a non-nil pointer",
-		)
-	}
-
+// Apply coerces value into a *jose.JWS, evaluates all rules, and returns the result or a ValidationError.
+func (ruleSet *JWSRuleSet) Apply(ctx context.Context, input any) (*jose.JWS, errors.ValidationError) {
 	jws, err := ruleSet.coerce(input, ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := ruleSet.Evaluate(ctx, jws); err != nil {
-		return err
+		return nil, err
 	}
 
-	outputElem := outputVal.Elem()
-
-	if outputElem.Kind() == reflect.Interface && outputElem.IsNil() {
-		outputElem.Set(reflect.ValueOf(jws))
-	} else if outputElem.Type().AssignableTo(reflect.TypeOf(jws)) {
-		outputElem.Set(reflect.ValueOf(jws))
-	} else {
-		return errors.Errorf(
-			errors.CodeInternal, ctx, "Cannot assign", "Cannot assign %T to %T", jws, outputElem.Interface(),
-		)
-	}
-
-	return nil
+	return jws, nil
 }
 
 // coerce attempts to coerce a string containing a compact JWS into a *jose.JWS and returns a ValidationError on failure.
@@ -166,8 +144,7 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors
 	}
 
 	if value.Header != nil {
-		var header any
-		if headerErr := baseHeaderRuleSet.Apply(ctx, value.Header, &header); headerErr != nil {
+		if _, headerErr := baseHeaderRuleSet.Apply(ctx, value.Header); headerErr != nil {
 			errs = append(errs, headerErr)
 		}
 	}

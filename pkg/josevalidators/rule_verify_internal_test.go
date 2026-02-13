@@ -75,14 +75,16 @@ func TestJWS_WithJWKSURL_CacheShared(t *testing.T) {
 	ruleSet1 := JWS().WithJWKSURL(url)
 	ruleSet2 := JWS().WithJWKSURL(url)
 
-	var out1, out2 *jose.JWS
 	ctx := context.Background()
-	if err := ruleSet1.Apply(ctx, compact, &out1); err != nil {
+	out1, err := ruleSet1.Apply(ctx, compact)
+	if err != nil {
 		t.Fatalf("first Apply: %v", err)
 	}
-	if err := ruleSet2.Apply(ctx, compact, &out2); err != nil {
+	out2, err := ruleSet2.Apply(ctx, compact)
+	if err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
+	_, _ = out1, out2
 
 	if n := requestCount.Load(); n != 1 {
 		t.Errorf("expected 1 request (cache shared), got %d", n)
@@ -117,8 +119,8 @@ func TestJWS_WithJWKSURL_304NotModified(t *testing.T) {
 	ruleSet := JWS().WithJWKSURL(server.URL)
 
 	// First request: full 200
-	var out1 *jose.JWS
-	if err := ruleSet.Apply(context.Background(), compact, &out1); err != nil {
+	_, err = ruleSet.Apply(context.Background(), compact)
+	if err != nil {
 		t.Fatalf("first Apply: %v", err)
 	}
 	if requestCount.Load() != 1 {
@@ -130,7 +132,8 @@ func TestJWS_WithJWKSURL_304NotModified(t *testing.T) {
 
 	// Second request: conditional, server returns 304
 	var out2 *jose.JWS
-	if err := ruleSet.Apply(context.Background(), compact, &out2); err != nil {
+	out2, err = ruleSet.Apply(context.Background(), compact)
+	if err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
 	if n := requestCount.Load(); n != 2 {
@@ -140,6 +143,7 @@ func TestJWS_WithJWKSURL_304NotModified(t *testing.T) {
 		t.Error("expected JWS after 304 to use cached value")
 	}
 }
+
 
 // TestJWS_WithJWKSURL_MinTTL tests that the JWKS cache enforces a minimum TTL before revalidation.
 func TestJWS_WithJWKSURL_MinTTL(t *testing.T) {
@@ -160,8 +164,8 @@ func TestJWS_WithJWKSURL_MinTTL(t *testing.T) {
 	ruleSet := JWS().WithJWKSURL(server.URL)
 
 	// First request
-	var out1 *jose.JWS
-	if err := ruleSet.Apply(context.Background(), compact, &out1); err != nil {
+	_, err := ruleSet.Apply(context.Background(), compact)
+	if err != nil {
 		t.Fatalf("first Apply: %v", err)
 	}
 	if requestCount.Load() != 1 {
@@ -169,8 +173,7 @@ func TestJWS_WithJWKSURL_MinTTL(t *testing.T) {
 	}
 
 	// Immediate second request: must use cache (min TTL), no new request
-	var out2 *jose.JWS
-	if err := ruleSet.Apply(context.Background(), compact, &out2); err != nil {
+	if _, err := ruleSet.Apply(context.Background(), compact); err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
 	if n := requestCount.Load(); n != 1 {

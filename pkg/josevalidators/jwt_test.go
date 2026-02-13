@@ -16,79 +16,28 @@ import (
 func TestBug(t *testing.T) {
 	jwtStr := "eyJhbGciOiJub25lIn0.eyJzY29wZSI6Im9wZW5pZCIsInJlc3BvbnNlX3R5cGUiOiJjb2RlIiwicmVkaXJlY3RfdXJpIjoiaHR0cHM6Ly9kZW1vLmNlcnRpZmljYXRpb24ub3BlbmlkLm5ldC90ZXN0L1N3Nm1VdU0xa3BEU205dC9jYWxsYmFjayIsInN0YXRlIjoiREFRVnF6b2hLbyIsIm5vbmNlIjoiOVBwaXFiZlR0eCIsImNsaWVudF9pZCI6Ijc0ZTYyYWZlLWUyYTctNDRiMS1iZTlkLTRkOTUwMWIyNWMzMSJ9."
 
-	var jwt *jose.JWT
-	err := josevalidators.JWT().Apply(context.Background(), jwtStr, &jwt)
-
-	if jwt == nil {
-		t.Error("Expect JWT to not be nil")
-	}
-
+	jwt, err := josevalidators.JWT().Apply(context.Background(), jwtStr)
 	if err != nil {
 		t.Error("Unexpected validation error:", err)
+	}
+	if jwt == nil {
+		t.Error("Expect JWT to not be nil")
 	}
 }
 
 func TestJWTOutputTypes(t *testing.T) {
 	jwtStr := "eyJhbGciOiJub25lIn0.eyJzY29wZSI6Im9wZW5pZCJ9."
 
-	t.Run("any output", func(t *testing.T) {
-		var output any
-		err := josevalidators.JWT().Apply(context.Background(), jwtStr, &output)
+	t.Run("Apply returns *jose.JWT", func(t *testing.T) {
+		jwt, err := josevalidators.JWT().Apply(context.Background(), jwtStr)
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
 		}
-		if output == nil {
-			t.Error("Expected output to not be nil")
+		if jwt == nil {
+			t.Error("Expected JWT to not be nil")
 		}
-	})
-
-	t.Run("*jose.JWT output", func(t *testing.T) {
-		var output jose.JWT
-		err := josevalidators.JWT().Apply(context.Background(), jwtStr, &output)
-		if err != nil {
-			t.Errorf("Expected no error, got: %v", err)
-		}
-		if output.Claims == nil {
+		if jwt.Claims == nil {
 			t.Error("Expected JWT claims to not be nil")
-		}
-	})
-
-	t.Run("**jose.JWT output", func(t *testing.T) {
-		var output *jose.JWT
-		err := josevalidators.JWT().Apply(context.Background(), jwtStr, &output)
-		if err != nil {
-			t.Errorf("Expected no error, got: %v", err)
-		}
-		if output == nil {
-			t.Error("Expected output to not be nil")
-		}
-		if output.Claims == nil {
-			t.Error("Expected JWT claims to not be nil")
-		}
-	})
-
-	t.Run("jose.JWS output", func(t *testing.T) {
-		var output jose.JWS
-		err := josevalidators.JWT().Apply(context.Background(), jwtStr, &output)
-		if err != nil {
-			t.Errorf("Expected no error, got: %v", err)
-		}
-		if output.Payload == "" {
-			t.Error("Expected JWS payload to not be empty")
-		}
-	})
-
-	t.Run("*jose.JWS output", func(t *testing.T) {
-		var output *jose.JWS
-		err := josevalidators.JWT().Apply(context.Background(), jwtStr, &output)
-		if err != nil {
-			t.Errorf("Expected no error, got: %v", err)
-		}
-		if output == nil {
-			t.Error("Expected output to not be nil")
-		}
-		if output.Payload == "" {
-			t.Error("Expected JWS payload to not be empty")
 		}
 	})
 }
@@ -128,8 +77,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 	t.Run("valid claim passes", func(t *testing.T) {
 		compact := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyMTIzIn0."
 		rs := josevalidators.JWT().WithClaim(jose.SubjectKey, rules.String().Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		jwt, err := rs.Apply(ctx, compact)
 		if err != nil {
 			t.Errorf("WithClaim(sub string): %v", err)
 		}
@@ -141,8 +89,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 	t.Run("required claim missing fails", func(t *testing.T) {
 		compact := "eyJhbGciOiJub25lIn0.eyJhdWQiOiJteS1hdWRpZW5jZSJ9."
 		rs := josevalidators.JWT().WithClaim(jose.SubjectKey, rules.String().WithRequired().Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		_, err := rs.Apply(ctx, compact)
 		if err == nil {
 			t.Error("WithClaim(sub required) with missing sub should error")
 		}
@@ -153,8 +100,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 		rs := josevalidators.JWT().
 			WithClaim(jose.SubjectKey, rules.String().Any()).
 			WithClaim(jose.IssuerKey, rules.String().Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		jwt, err := rs.Apply(ctx, compact)
 		if err != nil {
 			t.Errorf("WithClaim(sub + iss): %v", err)
 		}
@@ -166,8 +112,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 	t.Run("iss claim valid passes", func(t *testing.T) {
 		compact := "eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL215LWF1dGguc2VydmljZS9pZCJ9."
 		rs := josevalidators.JWT().WithClaim(jose.IssuerKey, rules.String().WithRequired().Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		jwt, err := rs.Apply(ctx, compact)
 		if err != nil {
 			t.Errorf("WithClaim(iss required): %v", err)
 		}
@@ -182,8 +127,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 	t.Run("iss claim missing fails when required", func(t *testing.T) {
 		compact := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0."
 		rs := josevalidators.JWT().WithClaim(jose.IssuerKey, rules.String().WithRequired().Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		_, err := rs.Apply(ctx, compact)
 		if err == nil {
 			t.Error("WithClaim(iss required) with missing iss should error")
 		}
@@ -193,8 +137,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 		compact := "eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL2V4cGVjdGVkLmlzc3Vlci9pZCJ9."
 		rs := josevalidators.JWT().WithClaim(jose.IssuerKey,
 			rules.String().WithAllowedValues("https://expected.issuer/id").Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		jwt, err := rs.Apply(ctx, compact)
 		if err != nil {
 			t.Errorf("WithClaim(iss allowed): %v", err)
 		}
@@ -207,8 +150,7 @@ func TestJWTRuleSet_WithClaim(t *testing.T) {
 		compact := "eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL3dyb25nLmlzc3Vlci9pZCJ9."
 		rs := josevalidators.JWT().WithClaim(jose.IssuerKey,
 			rules.String().WithAllowedValues("https://expected.issuer/id").Any())
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		_, err := rs.Apply(ctx, compact)
 		if err == nil {
 			t.Error("WithClaim(iss allowed values) with wrong iss should error")
 		}
@@ -329,8 +271,7 @@ func TestJWT_WithVerifyJWK(t *testing.T) {
 	// Token has exp=1708281011; use WithTime so it is not considered expired
 	ruleSet := josevalidators.JWT().WithTime(time.Unix(1708281000, 0)).WithVerifyJWK(jwk)
 	compact := `eyJhbGciOiJSUzI1NiIsImtpZCI6IlJTQTIwMjQwMjEyIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhZmQyODE0Yi00M2I4LTRjYmYtOGFmYy03NDY2MDJlMDBjMDQiLCJhdXRoX3RpbWUiOjE3MDgyNzczMzUsImV4cCI6MTcwODI4MTAxMSwiaWF0IjoxNzA4Mjc3NDEwLCJpc3MiOiJodHRwczovL3N0dWRpby5kZXYucHJvdG9hdXRoLmNvbSIsIm5vbmNlIjoiRjFGRnh5Y1lrWSIsInN1YiI6IjJjYjZiNmQ2LWEwY2ItNGI3Mi1iY2EwLTI1YTI5NzJkNjM3YiJ9.Q3Coybou0LIyQAhKDWSlq92E5xAIBfiOm51feugylkZ4SV5MQIwRJLNkK7ucYPUzMROZ6E5xFIlrbVojo4vPM8CTODD7A9IOKwa-qaEikIx7K4MGLCHo-NLGdMEEQh8hQZ_4Bs8tlJUSOn_SUXeSNXTyUI7jpRZ0cKtcyS9V-QIhe1hNcm9_RCJ2auOqr9ZyDWUelpdLGoaN1oT9aAsFUAfUjlA0E_V8J5IV2BLZ96W21ENfB4Jiys0NFiM-FNk-M94Xmq9KK51Brd-zmDBYQ3Sw7_8dy_PtLPLGbM9geDcTsi_RjjjQak2p5iR6qt2xiicQQhlJdYCVDRBIdXbhcg`
-	var jwt *jose.JWT
-	err := ruleSet.Apply(context.Background(), compact, &jwt)
+	jwt, err := ruleSet.Apply(context.Background(), compact)
 	if err != nil {
 		t.Errorf("JWT WithVerifyJWK Apply: %v", err)
 	}
@@ -344,8 +285,7 @@ func TestJWT_WithVerifyFunc(t *testing.T) {
 	// Token has exp=1708281011; use WithTime so it is not considered expired
 	ruleSet := josevalidators.JWT().WithTime(time.Unix(1708281000, 0)).WithVerifyFunc(func(_ context.Context, _ jose.Header) *jose.JWK { return jwk })
 	compact := `eyJhbGciOiJSUzI1NiIsImtpZCI6IlJTQTIwMjQwMjEyIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhZmQyODE0Yi00M2I4LTRjYmYtOGFmYy03NDY2MDJlMDBjMDQiLCJhdXRoX3RpbWUiOjE3MDgyNzczMzUsImV4cCI6MTcwODI4MTAxMSwiaWF0IjoxNzA4Mjc3NDEwLCJpc3MiOiJodHRwczovL3N0dWRpby5kZXYucHJvdG9hdXRoLmNvbSIsIm5vbmNlIjoiRjFGRnh5Y1lrWSIsInN1YiI6IjJjYjZiNmQ2LWEwY2ItNGI3Mi1iY2EwLTI1YTI5NzJkNjM3YiJ9.Q3Coybou0LIyQAhKDWSlq92E5xAIBfiOm51feugylkZ4SV5MQIwRJLNkK7ucYPUzMROZ6E5xFIlrbVojo4vPM8CTODD7A9IOKwa-qaEikIx7K4MGLCHo-NLGdMEEQh8hQZ_4Bs8tlJUSOn_SUXeSNXTyUI7jpRZ0cKtcyS9V-QIhe1hNcm9_RCJ2auOqr9ZyDWUelpdLGoaN1oT9aAsFUAfUjlA0E_V8J5IV2BLZ96W21ENfB4Jiys0NFiM-FNk-M94Xmq9KK51Brd-zmDBYQ3Sw7_8dy_PtLPLGbM9geDcTsi_RjjjQak2p5iR6qt2xiicQQhlJdYCVDRBIdXbhcg`
-	var jwt *jose.JWT
-	err := ruleSet.Apply(context.Background(), compact, &jwt)
+	_, err := ruleSet.Apply(context.Background(), compact)
 	if err != nil {
 		t.Errorf("JWT WithVerifyFunc Apply: %v", err)
 	}
@@ -356,8 +296,7 @@ func TestJWT_WithJWKS(t *testing.T) {
 	jwks := jose.NewJWKS(jwk)
 	ruleSet := josevalidators.JWT().WithTime(time.Unix(1708281000, 0)).WithJWKS(jwks)
 	compact := `eyJhbGciOiJSUzI1NiIsImtpZCI6IlJTQTIwMjQwMjEyIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhZmQyODE0Yi00M2I4LTRjYmYtOGFmYy03NDY2MDJlMDBjMDQiLCJhdXRoX3RpbWUiOjE3MDgyNzczMzUsImV4cCI6MTcwODI4MTAxMSwiaWF0IjoxNzA4Mjc3NDEwLCJpc3MiOiJodHRwczovL3N0dWRpby5kZXYucHJvdG9hdXRoLmNvbSIsIm5vbmNlIjoiRjFGRnh5Y1lrWSIsInN1YiI6IjJjYjZiNmQ2LWEwY2ItNGI3Mi1iY2EwLTI1YTI5NzJkNjM3YiJ9.Q3Coybou0LIyQAhKDWSlq92E5xAIBfiOm51feugylkZ4SV5MQIwRJLNkK7ucYPUzMROZ6E5xFIlrbVojo4vPM8CTODD7A9IOKwa-qaEikIx7K4MGLCHo-NLGdMEEQh8hQZ_4Bs8tlJUSOn_SUXeSNXTyUI7jpRZ0cKtcyS9V-QIhe1hNcm9_RCJ2auOqr9ZyDWUelpdLGoaN1oT9aAsFUAfUjlA0E_V8J5IV2BLZ96W21ENfB4Jiys0NFiM-FNk-M94Xmq9KK51Brd-zmDBYQ3Sw7_8dy_PtLPLGbM9geDcTsi_RjjjQak2p5iR6qt2xiicQQhlJdYCVDRBIdXbhcg`
-	var jwt *jose.JWT
-	err := ruleSet.Apply(context.Background(), compact, &jwt)
+	jwt, err := ruleSet.Apply(context.Background(), compact)
 	if err != nil {
 		t.Errorf("JWT WithJWKS Apply: %v", err)
 	}
@@ -375,8 +314,7 @@ func TestJWT_ExpNbf(t *testing.T) {
 		// Token expired at Unix 1 (1970)
 		payload := base64url.Encode([]byte(`{"exp":1,"sub":"a"}`))
 		compact := "eyJhbGciOiJub25lIn0." + payload + "."
-		var jwt *jose.JWT
-		err := josevalidators.JWT().Apply(ctx, compact, &jwt)
+		_, err := josevalidators.JWT().Apply(ctx, compact)
 		if err == nil {
 			t.Error("Apply with exp in past should error")
 		}
@@ -386,8 +324,7 @@ func TestJWT_ExpNbf(t *testing.T) {
 		// Token not valid until far future
 		payload := base64url.Encode([]byte(`{"nbf":9999999999,"sub":"a"}`))
 		compact := "eyJhbGciOiJub25lIn0." + payload + "."
-		var jwt *jose.JWT
-		err := josevalidators.JWT().Apply(ctx, compact, &jwt)
+		_, err := josevalidators.JWT().Apply(ctx, compact)
 		if err == nil {
 			t.Error("Apply with nbf in future should error")
 		}
@@ -399,8 +336,7 @@ func TestJWT_ExpNbf(t *testing.T) {
 		nbf := now - 3600
 		payload := base64url.Encode([]byte(fmt.Sprintf(`{"exp":%d,"nbf":%d,"sub":"a"}`, exp, nbf)))
 		compact := "eyJhbGciOiJub25lIn0." + payload + "."
-		var jwt *jose.JWT
-		err := josevalidators.JWT().Apply(ctx, compact, &jwt)
+		_, err := josevalidators.JWT().Apply(ctx, compact)
 		if err != nil {
 			t.Errorf("Apply with valid exp/nbf window should pass: %v", err)
 		}
@@ -463,8 +399,7 @@ func TestJWT_WithTime(t *testing.T) {
 		payload := base64url.Encode([]byte(`{"exp":1500003600,"nbf":1499996400,"sub":"a"}`))
 		compact := "eyJhbGciOiJub25lIn0." + payload + "."
 		rs := josevalidators.JWT().WithTime(eval)
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		jwt, err := rs.Apply(ctx, compact)
 		if err != nil {
 			t.Errorf("WithTime Apply: %v", err)
 		}
@@ -478,8 +413,7 @@ func TestJWT_WithTime(t *testing.T) {
 		payload := base64url.Encode([]byte(`{"exp":1499990000,"sub":"a"}`))
 		compact := "eyJhbGciOiJub25lIn0." + payload + "."
 		rs := josevalidators.JWT().WithTime(eval)
-		var jwt *jose.JWT
-		err := rs.Apply(ctx, compact, &jwt)
+		_, err := rs.Apply(ctx, compact)
 		if err == nil {
 			t.Error("WithTime Apply with expired token should error")
 		}
@@ -492,8 +426,7 @@ func TestJWTRuleSet_Evaluate_WithParsedJWT(t *testing.T) {
 	defer jose.DisableNone()
 	ctx := context.Background()
 	compact := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0."
-	var jwt *jose.JWT
-	err := josevalidators.JWT().Apply(ctx, compact, &jwt)
+	jwt, err := josevalidators.JWT().Apply(ctx, compact)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -503,17 +436,7 @@ func TestJWTRuleSet_Evaluate_WithParsedJWT(t *testing.T) {
 	}
 }
 
-func TestJWT_Apply_CannotAssign(t *testing.T) {
-	jose.EnableNone()
-	defer jose.DisableNone()
-	ctx := context.Background()
-	compact := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0."
-	var wrongType int
-	err := josevalidators.JWT().Apply(ctx, compact, &wrongType)
-	if err == nil {
-		t.Fatal("Apply with wrong output type should error")
-	}
-}
+// Apply returns (*jose.JWT, error); no output pointer, so "wrong output type" no longer applies.
 
 // evaluate(ctx, jwt, nil) when value.JWS() fails (e.g. unmarshalable claims)
 func TestJWTRuleSet_Evaluate_JWSFails(t *testing.T) {
@@ -532,14 +455,14 @@ func TestJWTRuleSet_Evaluate_RuleReturnsError(t *testing.T) {
 	defer jose.DisableNone()
 	ctx := context.Background()
 	compact := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0.e30"
-	var jwt *jose.JWT
-	if err := josevalidators.JWT().Apply(ctx, compact, &jwt); err != nil {
+	jwt, err := josevalidators.JWT().Apply(ctx, compact)
+	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	failRule := josevalidators.JWT().WithRuleFunc(func(_ context.Context, _ *jose.JWT) errors.ValidationError {
 		return errors.Errorf(errors.CodeInternal, context.Background(), "fail", "fail")
 	})
-	err := failRule.Evaluate(ctx, jwt)
+	err = failRule.Evaluate(ctx, jwt)
 	if err == nil {
 		t.Fatal("Evaluate when rule returns error should error")
 	}
@@ -551,14 +474,14 @@ func TestJWTRuleSet_Evaluate_RuleSucceeds(t *testing.T) {
 	defer jose.DisableNone()
 	ctx := context.Background()
 	compact := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0.e30"
-	var jwt *jose.JWT
-	if err := josevalidators.JWT().Apply(ctx, compact, &jwt); err != nil {
+	jwt, err := josevalidators.JWT().Apply(ctx, compact)
+	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	passRule := josevalidators.JWT().WithRuleFunc(func(_ context.Context, _ *jose.JWT) errors.ValidationError {
 		return nil
 	})
-	err := passRule.Evaluate(ctx, jwt)
+	err = passRule.Evaluate(ctx, jwt)
 	if err != nil {
 		t.Errorf("Evaluate when rule returns nil should succeed: %v", err)
 	}
@@ -571,8 +494,7 @@ func TestJWT_Apply_JWTFromJWSError(t *testing.T) {
 	// Valid header, payload that is base64 but not valid JSON → JWTFromJWS fails
 	payloadB64 := base64url.Encode([]byte("not-json"))
 	compact := "eyJhbGciOiJub25lIn0." + payloadB64 + ".e30"
-	var jwt *jose.JWT
-	err := josevalidators.JWT().Apply(ctx, compact, &jwt)
+	_, err := josevalidators.JWT().Apply(ctx, compact)
 	if err == nil {
 		t.Fatal("Apply when JWTFromJWS fails (invalid payload JSON) should error")
 	}
@@ -585,8 +507,7 @@ func TestJWT_Apply_ClaimsValidationError(t *testing.T) {
 	// exp as string instead of int → claims Apply fails
 	payload := base64url.Encode([]byte(`{"exp":"not-a-number"}`))
 	compact := "eyJhbGciOiJub25lIn0." + payload + ".e30"
-	var jwt *jose.JWT
-	err := josevalidators.JWT().Apply(ctx, compact, &jwt)
+	_, err := josevalidators.JWT().Apply(ctx, compact)
 	if err == nil {
 		t.Fatal("Apply when claims validation fails should error")
 	}

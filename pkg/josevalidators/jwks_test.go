@@ -21,8 +21,7 @@ func testProcessJWKS(t testing.TB, jwksJSON string, ruleSet rules.RuleSet[*jose.
 
 	// If the JSON is valid, call the provided function
 	// Purposely converting to Any() here because that will be the most common use of this rule set.
-	var output *jose.JWKS
-	if err := ruleSet.Any().Apply(context.Background(), jwks, &output); err != nil {
+	if _, err := ruleSet.Any().Apply(context.Background(), jwks); err != nil {
 		t.Errorf("Apply function returned an error: %v", err)
 	}
 }

@@ -32,7 +32,7 @@ func testProcessJWK(t testing.TB, jwkJSON string, ruleSet rules.RuleSet[*jose.JW
 	}
 
 	// If the JSON is valid, call the provided function
-	if err := ruleSet.Apply(context.Background(), jwk, &jose.JWK{}); err != nil {
+	if _, err := ruleSet.Apply(context.Background(), jwk); err != nil {
 		t.Errorf("Apply function returned errors: %v", err)
 	}
 }

@@ -52,9 +52,9 @@ func (ruleSet *JWKRuleSet) WithRequired() *JWKRuleSet {
 	}
 }
 
-// Apply performs a validation of a RuleSet against a value and returns a ValidationError.
-func (ruleSet *JWKRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationError {
-	return ruleSet.inner.Apply(ctx, input, output)
+// Apply coerces value into a *jose.JWK, evaluates all rules, and returns the result or a ValidationError.
+func (ruleSet *JWKRuleSet) Apply(ctx context.Context, input any) (*jose.JWK, errors.ValidationError) {
+	return ruleSet.inner.Apply(ctx, input)
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the

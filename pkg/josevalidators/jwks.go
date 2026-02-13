@@ -38,12 +38,11 @@ func (ruleSet *JWKSRuleSet) WithRequired() *JWKSRuleSet {
 	}
 }
 
-// Apply performs a validation of a RuleSet against a value and returns a string value or
-// a ValidationError.
-func (ruleSet *JWKSRuleSet) Apply(ctx context.Context, input, output any) errors.ValidationError {
+// Apply coerces value into a *jose.JWKS, evaluates all rules, and returns the result or a ValidationError.
+func (ruleSet *JWKSRuleSet) Apply(ctx context.Context, input any) (*jose.JWKS, errors.ValidationError) {
 	return ruleSet.inner.
 		WithKey("keys", rules.Slice[*jose.JWK]().WithItemRuleSet(ruleSet.items).Any()).
-		Apply(ctx, input, output)
+		Apply(ctx, input)
 }
 
 // Evaluate performs a validation of a RuleSet against a string value and returns a string value of the
