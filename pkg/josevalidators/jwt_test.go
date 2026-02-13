@@ -34,7 +34,7 @@ func TestJWTOutputTypes(t *testing.T) {
 			t.Errorf("Expected no error, got: %v", err)
 		}
 		if jwt == nil {
-			t.Error("Expected JWT to not be nil")
+			t.Fatal("Expected JWT to not be nil")
 		}
 		if jwt.Claims == nil {
 			t.Error("Expected JWT claims to not be nil")
