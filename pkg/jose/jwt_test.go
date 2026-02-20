@@ -1,7 +1,13 @@
 package jose_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 
 	"proto.zip/studio/jose/internal/base64url"
@@ -150,4 +156,51 @@ func TestJWT_JWS_SignError(t *testing.T) {
 	if err == nil {
 		t.Fatal("JWS when Sign fails should error")
 	}
+}
+
+// TestECKeyCreateAndSignedJWT is a script-style test: it creates a new EC key,
+// dumps the JWK to stdout, then creates a JWT signed with that key and dumps
+// the compact JWT to stdout. Run with: go test -run TestECKeyCreateAndSignedJWT -v ./pkg/jose
+func TestECKeyCreateAndSignedJWT(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate EC key: %v", err)
+	}
+
+	jwkPrivate, err := jose.NewJWK(privateKey)
+	if err != nil {
+		t.Fatalf("JWK from key: %v", err)
+	}
+	jwkPublic, err := jose.NewJWK(&privateKey.PublicKey)
+	if err != nil {
+		t.Fatalf("public JWK from key: %v", err)
+	}
+	jwkPublic.Alg = "ES256"
+	jwkPublic.Use = "sig"
+	jwkPublic.Kid = "ec-test-key"
+
+	jwkJSON, err := json.MarshalIndent(jwkPublic, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal JWK: %v", err)
+	}
+	fmt.Fprintln(os.Stdout, "--- JWK (public) ---")
+	os.Stdout.Write(jwkJSON)
+	fmt.Fprintln(os.Stdout, "")
+
+	alg, err := jwkPrivate.Algorithm("ES256")
+	if err != nil {
+		t.Fatalf("algorithm from JWK: %v", err)
+	}
+
+	jwt := jose.NewJWT(alg)
+	jwt.Claims[jose.SubjectKey] = "test-subject"
+	jwt.Claims[jose.IssuerKey] = "test-issuer"
+	jwt.Claims[jose.IssuedAtKey] = 1700000000
+
+	compact, err := jwt.Compact()
+	if err != nil {
+		t.Fatalf("compact JWT: %v", err)
+	}
+	fmt.Fprintln(os.Stdout, "--- Signed JWT ---")
+	fmt.Fprintln(os.Stdout, compact)
 }

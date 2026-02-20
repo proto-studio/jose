@@ -513,3 +513,26 @@ func TestJWT_Apply_ClaimsValidationError(t *testing.T) {
 	}
 }
 
+// JWT Evaluate/Apply returns validation error when inner JWS has alg not "none" and no signature verification function.
+func TestJWT_Evaluate_RequiresVerificationWhenAlgNotNone(t *testing.T) {
+	ctx := context.Background()
+	// Compact with HS256, no WithVerify* — inner JWS Evaluate should error
+	compact := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.2_LNHFdcd5lv342TTvWSroucQY03R4ZBBM1Pwgvfqt8"
+	_, err := josevalidators.JWT().Apply(ctx, compact)
+	if err == nil {
+		t.Fatal("JWT Apply with signed compact and no verifier should error")
+	}
+	// With alg none, no verifier is required
+	jose.EnableNone()
+	defer jose.DisableNone()
+	compactNone := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0."
+	jwt, err := josevalidators.JWT().Apply(ctx, compactNone)
+	if err != nil {
+		t.Fatalf("JWT Apply with alg none and no verifier should pass: %v", err)
+	}
+	err = josevalidators.JWT().Evaluate(ctx, jwt)
+	if err != nil {
+		t.Errorf("JWT Evaluate with alg none and no verifier should pass: %v", err)
+	}
+}
+

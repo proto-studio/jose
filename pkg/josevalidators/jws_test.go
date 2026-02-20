@@ -15,6 +15,9 @@ import (
 
 const compactString string = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.2_LNHFdcd5lv342TTvWSroucQY03R4ZBBM1Pwgvfqt8"
 
+// compactNone is a compact JWS with alg "none" (3 parts, empty signature). Use with jose.EnableNone() for tests that don't need signature verification.
+const compactNone string = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0."
+
 func checkJWS(b, a any) error {
 	jws, ok := a.(*jose.JWS)
 	if !ok {
@@ -38,8 +41,10 @@ func TestJWSRuleSet(t *testing.T) {
 
 // JWS Apply returns (*jose.JWS, error).
 func TestJWS_Apply_OutputInterfaceNil(t *testing.T) {
+	jose.EnableNone()
+	defer jose.DisableNone()
 	ruleSet := josevalidators.JWS()
-	output, err := ruleSet.Apply(context.Background(), compactString)
+	output, err := ruleSet.Apply(context.Background(), compactNone)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -100,6 +105,32 @@ func TestJWS_Evaluate_InvalidPayloadBase64(t *testing.T) {
 	}
 }
 
+// JWS Evaluate/Apply returns validation error when alg is not "none" and no signature verification function is configured.
+func TestJWS_Evaluate_RequiresVerificationWhenAlgNotNone(t *testing.T) {
+	ctx := context.Background()
+	// HS256 in header, no verifier
+	jws := &jose.JWS{
+		Protected: "eyJhbGciOiJIUzI1NiJ9", // {"alg":"HS256"}
+		Payload:   "e30",
+		Signature: "e30",
+	}
+	err := josevalidators.JWS().Evaluate(ctx, jws)
+	if err == nil {
+		t.Fatal("expected error when alg is not none and no verification function")
+	}
+	_, err = josevalidators.JWS().Apply(ctx, compactString)
+	if err == nil {
+		t.Fatal("Apply with signed compact and no verifier should error")
+	}
+	// With verifier (no-op that returns a JWK) Apply can succeed or fail on actual verify; with alg none no verifier is required
+	jose.EnableNone()
+	defer jose.DisableNone()
+	err = josevalidators.JWS().Evaluate(ctx, &jose.JWS{Protected: "eyJhbGciOiJub25lIn0", Payload: "e30", Signature: ""})
+	if err != nil {
+		t.Errorf("alg none without verifier should pass when None enabled: %v", err)
+	}
+}
+
 // Requirements:
 // - Parses compact string.
 // - Signature matches.
@@ -107,9 +138,12 @@ func TestJWS_Evaluate_InvalidPayloadBase64(t *testing.T) {
 // - Headers is nil.
 // - JWS is flat (Signatures is nil).
 func TestJWSParseCompact(t *testing.T) {
+	jose.EnableNone()
+	defer jose.DisableNone()
 	ruleSet := josevalidators.JWS()
 
-	jws, err := ruleSet.Apply(context.Background(), compactString)
+	parts := strings.Split(compactNone, ".")
+	jws, err := ruleSet.Apply(context.Background(), compactNone)
 	if err != nil {
 		t.Fatalf("Expected error to be nil, got: %s", err)
 	}
@@ -121,8 +155,6 @@ func TestJWSParseCompact(t *testing.T) {
 	if jws.Signatures != nil {
 		t.Errorf("Expected signatures to be nil, got: %v", jws.Signatures)
 	}
-
-	parts := strings.Split(compactString, ".")
 
 	if jws.Signature != parts[2] {
 		t.Errorf("Expected signatures to be %s, got: %s", parts[2], jws.Signature)
@@ -157,16 +189,17 @@ func TestJWSParseTooManyParts(t *testing.T) {
 
 // Requirements:
 // - Fails if 2 parts and None is not enabled
-// - Succeeds if 2 parts and none is enabled
+// - Succeeds if 2 parts and alg is none when none is enabled
 func TestJWSParseNone(t *testing.T) {
 	ruleSet := josevalidators.JWS()
-	val := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0"
+	valHS256 := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0"
+	valNone := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ0ZXN0In0"
 
-	testhelpers.MustNotApply(t, ruleSet.Any(), val, errors.CodePattern)
+	testhelpers.MustNotApply(t, ruleSet.Any(), valHS256, errors.CodePattern)
 
 	jose.EnableNone()
 	defer jose.DisableNone()
-	testhelpers.MustApplyFunc(t, ruleSet.Any(), val, nil, checkJWS)
+	testhelpers.MustApplyFunc(t, ruleSet.Any(), valNone, nil, checkJWS)
 }
 
 // Requirements:
@@ -176,9 +209,11 @@ func TestJWSParseNone(t *testing.T) {
 // - Paths must match
 // - Returns all errors
 func TestBase64URL(t *testing.T) {
+	jose.EnableNone()
+	defer jose.DisableNone()
 	ruleSet := josevalidators.JWS()
 
-	parts := strings.Split(compactString, ".")
+	parts := strings.Split(compactNone, ".")
 
 	testhelpers.MustApplyFunc(t, ruleSet.Any(), strings.Join(parts, "."), nil, checkJWS)
 

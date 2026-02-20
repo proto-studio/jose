@@ -167,13 +167,27 @@ func (ruleSet *JWSRuleSet) Evaluate(ctx context.Context, value *jose.JWS) errors
 	currentRuleSet := ruleSet
 	ctx = rulecontext.WithRuleSet(ctx, ruleSet)
 
+	var sawVerifyRule bool
 	for currentRuleSet != nil {
 		if currentRuleSet.rule != nil {
+			if _, isVerifyRule := currentRuleSet.rule.(*verifyRule); isVerifyRule {
+				sawVerifyRule = true
+			}
 			if err := currentRuleSet.rule.Evaluate(ctx, value); err != nil {
 				errs = append(errs, err)
 			}
 		}
 		currentRuleSet = currentRuleSet.parent
+	}
+
+	// When alg is not "none", a signature verification function must be configured.
+	if len(errs) == 0 {
+		head, headErr := value.FullHeader()
+		if headErr == nil {
+			if alg, _ := head[jose.HeaderAlg].(string); alg != "" && alg != "none" && !sawVerifyRule {
+				errs = append(errs, errors.Errorf(errors.CodeForbidden, signatureCtx, "Signature verification required", "Signature verification required when alg is not none"))
+			}
+		}
 	}
 
 	if len(errs) > 0 {
