@@ -26,4 +26,8 @@ Include the steps to follow and the version you're using, if you can.
 Leave these blank if not, or if you're not sure.
 
 - [ ] Sign-in or tokens
+- [ ] Creating or verifying signatures
 - [ ] Encryption, keys, or certificates
+- [ ] Which algorithms or options are allowed
+- [ ] Parsing data from untrusted sources
+- [ ] A breaking change to the public API
